@@ -27,9 +27,9 @@
 
 La configuration Claude est synchronisée via le dépôt `~/claude-config`.
 - **Toute modification de paramétrage** (CLAUDE.md, dart.instructions.md, settings.json, mcp.json, skills, commands, etc.) doit être faite dans `~/claude-config/config/`, **jamais** directement dans `~/.claude/`.
-- Au début de chaque session, exécuter `bash ~/claude-config/status.sh` et proposer un pull ou push si nécessaire.
-- Après modification, exécuter `bash ~/claude-config/push.sh` pour appliquer localement et pousser vers le remote.
-- Sur une autre machine, exécuter `bash ~/claude-config/pull.sh` pour récupérer et appliquer la configuration.
+- Au début de chaque session, exécuter `bash ~/claude-config/status.sh` et proposer `/claude-sync` si nécessaire.
+- Après modification de la config, exécuter `bash ~/claude-config/push.sh` pour appliquer localement et pousser vers le remote.
+- Pour synchroniser depuis le remote (autre machine), utiliser la commande `/claude-sync`.
 
 # MCP Dart
 
