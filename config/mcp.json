@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "md-renumber": {
+      "command": "python",
+      "args": [
+        "-m",
+        "md_renumber.mcp_server"
+      ],
+      "env": {
+        "PYTHONPATH": "c:\\Travail\\Projets\\Tools\\md-renumber"
+      }
+    }
+  }
+}

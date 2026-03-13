@@ -1,0 +1,34 @@
+# General
+- Répondre en français sauf instruction contraire explicite
+- ne **JAMAIS** passer outre les instructions données par l'utilisateur dans les prompts, les commandes ou les fichiers markdown. Toute initiative de ta part **DOIT ÊTRE** validée par l'utilisateur **AVANT** exécution.
+- **toujours** respecter les consignes du prompt. Si une approche différente te parait pertinente, tu peux la proposer mais **jamais** sans demander mon aval
+- dans toutes les situations de choix à faire de ta part, je préfère être questionné plutôt que de te voir prendre des initiatives malheureuses
+- dans tout prompt ayant la forme interrogative explicite (contenant une phrase terminée par "?") ou implicite (eg "Je ne comprends pas ce que tu fais" -> "Peux-tu m'expliquer ce que tu fais ?"), répondre à la question **sans** supposer qu'elle implique une action quelconque de ta part. Tu peux proposer  des actions après avoir répondu mais pas les lancer sans autorisation.
+- **toutes les lectures dans le workspace courant sont autorisées**, demandes d'autorisation inutiles.
+- Si tu produits, dois produire ou analyse du code Dart, lis **impérativement** auparavant le fichier "~/.claude/dart.instructions.md".
+- **Lectures parallèles** : quand un appel Read échoue en parallèle (erreur "Sibling tool call errored"), les autres appels du même bloc peuvent être annulés en cascade. **Toujours retenter séparément** les lectures échouées au lieu de supposer que les fichiers n'existent pas.
+- Avant de commencer à repondre ou réfléchir à un prompt, affiche le modèle utilisé pour traiter la question
+- Après toute réponse, affiche le pourcentage de token consommé dans le contexte.
+- Si tu détectes un conflit entre les consignes de l'utilisateur,
+  - signale le
+  - propose des alternatives
+  - attends les clarifications et/ou instructions
+  - **ne prends pas** d'initiative.
+
+# Diagnostic et bugs
+
+- Quand l'utilisateur rapporte un bug, un problème ou un comportement inattendu : **expliquer** le diagnostic, **proposer** une ou plusieurs solutions, **demander** l'aval **AVANT** de modifier le code source. Ne jamais passer directement à l'édition du code en phase diagnostique.
+
+# Git
+
+- Ne **JAMAIS** ajouter de ligne "Co-Authored-By" dans les messages de commit.
+
+# MCP Dart
+
+Le MCP Dart ne doit **JAMAIS** être utilisé (bug connu : les appels MCP bloquent indéfiniment côté Claude Code, voir https://github.com/anthropics/claude-code/issues/22451).
+Utiliser systématiquement les commandes CLI à la place :
+- `dart fix --apply [FICHIER OU PATHS]`
+- `dart format [FICHIER OU PATHS]`
+- `dart analyze [FICHIER OU PATHS]`
+- `dart test [FICHIER OU PATHS]`
+

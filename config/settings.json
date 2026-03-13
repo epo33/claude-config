@@ -1,0 +1,8 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash /c/Users/emman/.claude/statusline-command.sh"
+  },
+  "language": "français",
+  "skipDangerousModePermissionPrompt": true
+}
