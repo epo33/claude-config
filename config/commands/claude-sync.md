@@ -4,7 +4,7 @@ description: Synchronise la config Claude depuis claude-config et initialise cop
 
 Exécuter les étapes suivantes dans l'ordre :
 
-1. Exécuter `bash ~/claude-config/pull.sh` pour synchroniser la configuration Claude depuis le dépôt distant et l'appliquer dans `~/.claude/`.
+1. Exécuter `bash ~/claude-config/sync.sh` pour synchroniser la configuration Claude de manière bidirectionnelle (commit+push des modifications locales, pull depuis le remote, application dans `~/.claude/`).
 
 2. Si le workspace courant est un projet Dart/Flutter (présence d'un fichier `pubspec.yaml` à la racine) :
    - Vérifier si le fichier `.github/copilot-instructions.md` existe à la racine du projet.
