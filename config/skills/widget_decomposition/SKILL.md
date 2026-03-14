@@ -205,6 +205,26 @@ Proposer la décomposition quand **au moins un** critère est vrai :
   pas encore décomposé → **proposer** la décomposition à l'utilisateur,
   **attendre sa validation** avant d'agir
 
+## styled_widget : notations postfix
+
+Si le projet dépend du package `styled_widget`, **TOUJOURS** utiliser les
+notations postfix à la place des widgets conteneurs équivalents
+(`Padding`, `Expanded`, `SizedBox`, `Center`, `ClipRRect`, `Transform`…).
+
+```dart
+// ❌ À éviter
+Padding(
+  padding: const EdgeInsets.all(16),
+  child: Expanded(child: Text("hello").bold()),
+)
+
+// ✅ styled_widget
+Text("hello").bold().padding(all: 16).expanded()
+```
+
+Référence complète des 78 méthodes disponibles (Widget, Text, TextSpan, Icon,
+List<Widget>) : voir [styled_widget.md](./styled_widget.md).
+
 ## Utilitaires partagés
 
 Tout projet Flutter devrait définir des utilitaires réutilisables :

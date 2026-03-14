@@ -19,19 +19,27 @@ if git remote | grep -q .; then
 fi
 
 # --- Étape 1 : commit + push des modifications locales ---
-git add -A
+# Le commit est géré par l'appelant (/claude-sync) si --skip-commit est passé,
+# afin que le LLM puisse générer un libellé significatif.
+SKIP_COMMIT=false
+for arg in "$@"; do
+  [ "$arg" = "--skip-commit" ] && SKIP_COMMIT=true
+done
 
-if ! git diff --cached --quiet; then
-  msg="sync: $(hostname) $(date +%Y-%m-%d_%H:%M)"
-  git commit -m "$msg"
-  echo "Commit local créé."
+if ! $SKIP_COMMIT; then
+  git add -A
+  if ! git diff --cached --quiet; then
+    msg="sync: $(hostname) $(date +%Y-%m-%d_%H:%M)"
+    git commit -m "$msg"
+    echo "Commit local créé."
 
-  if $HAS_REMOTE; then
-    git push
-    echo "Push effectué."
+    if $HAS_REMOTE; then
+      git push
+      echo "Push effectué."
+    fi
+  else
+    echo "Aucune modification locale."
   fi
-else
-  echo "Aucune modification locale."
 fi
 
 # --- Étape 2 : pull depuis le remote ---
