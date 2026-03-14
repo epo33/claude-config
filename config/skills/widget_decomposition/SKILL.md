@@ -25,7 +25,7 @@ dans un dossier dédié portant le nom du widget :
 ```
 my_widget/
 ├── my_widget.dart          ← fichier principal (plomberie Flutter)
-├── my_widget.events.dart   ← extension privée (handlers d'événements)
+├── my_widget.events.dart   ← mixin privé (handlers d'événements)
 └── my_widget.parts.dart    ← mixin privé (sous-widgets)
 ```
 
@@ -114,16 +114,14 @@ class _MyWidgetState extends State<MyWidget> with _MyWidgetParts {
 ### Fichier événements — `my_widget.events.dart`
 
 - `part of "my_widget.dart";`
-- Extension privée sur la classe State
+- Mixin privé sur la classe State
 - Contient les handlers d'événements non triviaux
 - Accès direct à `widget`, `context`, `setState`, `mounted` (même bibliothèque)
-- **Avantage** : une extension ne peut pas déclarer de variables membres →
-  les mutations d'état sont strictement localisées dans le fichier principal
 
 ```dart
 part of "my_widget.dart";
 
-extension _MyWidgetEvents on _MyWidgetState {
+mixin _MyWidgetEvents on State<MyWidget> {
   Future<void> onSaveTap() async {
     final confirmed = await showConfirm(
       context,
