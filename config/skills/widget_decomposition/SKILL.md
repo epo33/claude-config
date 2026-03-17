@@ -75,6 +75,62 @@ Contient uniquement :
     StreamBuilder…) et utilise les fonctions/champs du mixin pour les
     feuilles et les méthodes de l'extension pour les handlers
 
+#### Ordre des membres dans la classe State
+
+Dans la classe State (décomposée ou non), respecter cet ordre :
+
+1. **Getters sur les propriétés du widget** — raccourcis pour éviter `widget.prop` dans le corps de la classe
+2. **Champs `final`** — dépendances injectées, constantes d'instance
+3. **Champs `late`** — initialisés dans `initState()`
+4. **`initState()`** — si nécessaire
+5. **`dispose()`** — si nécessaire
+6. **`build()`** — toujours présent
+7. **`didUpdateWidget()`** — si nécessaire
+8. **Handlers d'événements** — dans le cas dégénéré (widget simple, pas de `*.events.dart`), les callbacks restent ici ; sinon délégués au mixin `_MyWidgetEvents`
+9. **Méthodes utilitaires** — dans le cas dégénéré (pas de `*.parts.dart`) ; sinon déléguées au mixin `_MyWidgetParts`
+
+```dart
+class _MyWidgetState extends State<MyWidget> with _MyWidgetParts {
+  // 1. Getters widget
+  String get title => widget.title;
+  bool get isReadOnly => widget.isReadOnly;
+
+  // 2. Champs final
+  final _formKey = GlobalKey<FormState>();
+
+  // 3. Champs late
+  late final TextEditingController _controller;
+
+  // 4. initState
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: title);
+  }
+
+  // 5. dispose
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  // 6. build
+  @override
+  Widget build(BuildContext context) { ... }
+
+  // 7. didUpdateWidget (si nécessaire)
+  @override
+  void didUpdateWidget(MyWidget old) { ... }
+
+  // 8. Handlers (cas dégénéré seulement)
+  void _onSubmit() { ... }
+
+  // 9. Méthodes utilitaires (cas dégénéré seulement)
+  String _formatValue(double v) => v.toStringAsFixed(2);
+}
+```
+
 ```dart
 import "package:flutter/material.dart";
 
