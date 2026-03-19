@@ -46,6 +46,10 @@ La configuration Claude est synchronisée via le dépôt `~/claude-config`.
 
 Production via pandoc + xelatex. Les instructions détaillées sont dans le skill `pdf` (auto-détecté).
 
+# Redaction EPO
+
+Quand un fichier markdown contient le marqueur `<!-- redaction-epo -->`, lire et appliquer le skill `redaction-epo` avant toute modification de ce document.
+
 # MCP Dart
 
 Le MCP Dart ne doit **JAMAIS** être utilisé (bug connu : les appels MCP bloquent indéfiniment côté Claude Code, voir https://github.com/anthropics/claude-code/issues/22451).

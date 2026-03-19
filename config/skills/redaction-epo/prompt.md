@@ -1,0 +1,80 @@
+# Règles de rédaction EPO
+
+Ce document définit les conventions de rédaction appliquées aux documents destinés à être émis par EPO (CR, courriels, rapports, recommandations, annexes).
+
+---
+
+**Règle fondamentale : orthographe irréprochable.** Aucune faute d'orthographe, de grammaire ou d'accord n'est acceptable dans un document émis.
+
+## 1. Ponctuation
+
+- **Pas de tiret cadratin (—)** comme ponctuation de phrase. Remplacer par :
+  - Virgule (cas le plus fréquent)
+  - Point-virgule (opposition ou conséquence)
+  - Deux-points (explication, liste, définition)
+  - Points de suspension (pause, chute)
+  - Point + nouvelle phrase (rupture nette)
+- Les tirets cadratins restent acceptables dans les **titres de sections** comme séparateur structurel (ex : `## Section — Sous-titre`).
+- Utiliser la virgule pour les incises courantes. Réserver les parenthèses aux apartés qui relèveraient d'une note de bas de page.
+
+## 2. Typographie française
+
+- Guillemets français « » avec espaces insécables à l'intérieur.
+- Espace insécable avant `:`, `;`, `!`, `?`. Espace normale après.
+- Pas de double espace après un point.
+- Apostrophe droite standard (`'`), pas d'apostrophe typographique courbe.
+- Majuscules : premier mot de phrase, acronymes, noms propres. Pas de majuscule de prestige.
+
+## 3. Anglicismes
+
+### Acceptables
+
+Mots anglais entrés dans la langue courante française et reconnus par l'usage général (pas seulement le jargon de bureau) :
+- planning, parking, sandwich, week-end, etc.
+- Termes techniques informatiques sans équivalent français établi : frontend, backend, framework, skill, webhook, etc.
+
+### À remplacer
+
+Jargon professionnel anglophone disposant d'un équivalent français naturel :
+- feedback → retour, retour d'information
+- brief → note de cadrage, synthèse
+- mail → courriel, courrier électronique (dans un document formel)
+- meeting → réunion
+- deadline → échéance
+- issue → problème, incident
+- mitigation → atténuation
+- to do → tâche, action
+
+Cette liste n'est pas exhaustive. Le principe : le globish de bureau n'a pas sa place dans un document écrit. Si un mot français aussi précis existe, l'utiliser systématiquement.
+
+## 4. Registre et ton
+
+- Style direct, concis, factuel. Soutenu sans être pompeux.
+- Phrases courtes par défaut. Les phrases longues sont acceptables quand l'idée exprimée le nécessite.
+- Métaphores et expressions bienvenues pour éclairer un concept, surtout auprès d'un lecteur non technique. Elles doivent rester dans un registre professionnel.
+- Vocabulaire riche et précis. Préférer le mot juste au mot générique.
+- L'humour est bienvenu avec parcimonie : dédramatiser une situation, appuyer un point quand une formule permet de mieux le faire comprendre. Pas à chaque phrase.
+- « Vous » par défaut pour tout interlocuteur. Le tutoiement ne sera utilisé que sur indication explicite.
+- L'auteur (EPO) peut utiliser « je » pour les positions personnelles.
+
+## 5. Structure
+
+- Définir les acronymes à leur première utilisation : décomposition entre parenthèses juste après, majuscule à chaque lettre composant l'acronyme, suivie d'une brève explication. Ex : « Le PO (Product Owner, responsable de la vision produit) a validé le périmètre. » Ne pas décomposer les acronymes évidents pour le destinataire (SNCF dans un courrier à la SNCF, PO dans un document destiné à des développeurs, etc.).
+- Les notes explicatives (définitions de termes techniques) précèdent le contenu qui les utilise.
+- Ne JAMAIS faire référence à un point du document situé plus loin sans ajouter un renvoi explicite entre parenthèses (« voir plus loin », « voir ci-après », « cf. section X »).
+- Quand un renvoi vers un document externe est indiqué, tout le contenu de ce document est considéré comme lu et connu dans la suite du texte. Ne pas répéter ce qui y est déjà expliqué.
+
+## 6. Courriels
+
+- Ouverture : « Bonjour, » (ou « Bonjour [Prénom], »)
+- Clôture : « Cordialement, » uniquement. Pas d'emphase (« Très cordialement », « Bien à vous », etc.).
+
+## 7. Marqueur de document
+
+Tout document traité par cette skill reçoit le marqueur suivant en fin de fichier :
+
+```html
+<!-- redaction-epo -->
+```
+
+Ce marqueur signale que le document est destiné à être émis et que les règles ci-dessus s'appliquent automatiquement à toute modification ultérieure.
