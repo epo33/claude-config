@@ -34,7 +34,6 @@
 # Git
 
 - Ne **JAMAIS** ajouter de ligne "Co-Authored-By" dans les messages de commit.
-- **Opérations destructives interdites** : ne JAMAIS exécuter directement `git checkout --`, `git restore`, `git reset --hard`, `git clean -f`, `git stash drop/clear`, `git branch -D`, `git push --force`, `rm`, `rmdir`, `del`, `mv` (écrasement). Un hook bloque ces commandes. Si une opération destructive est nécessaire, fournir la commande dans un bloc de code pour que l'utilisateur la copie et l'exécute lui-même.
 
 # Synchronisation de la configuration
 
