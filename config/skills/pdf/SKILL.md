@@ -5,47 +5,45 @@ description: "Instructions pour la production de PDF via pandoc + xelatex. Auto-
 
 Use this skill when the user asks to generate, convert, or produce a PDF file (e.g., from markdown). Triggers on keywords: PDF, pandoc, xelatex, "convertir en PDF", "générer un PDF".
 
-## Commande de base
+**Style de réponse — CRITIQUE** :
+- **ZÉRO narration** : ne JAMAIS commenter les étapes internes. L'utilisateur ne doit voir que le résultat final.
+- **Ne JAMAIS afficher** les noms de variables du script (TEX_FILE, TEX_SOURCE, FIRST_RUN, VIOLATIONS, TEX_CONTENT). Interpréter silencieusement la sortie et ne montrer que le message destiné à l'utilisateur.
+- **Sortie attendue** : uniquement les violations (si présentes) et/ou la question first-run (si applicable) et/ou la confirmation de conversion. Rien d'autre.
+
+## Étape 1 : Pré-vérification
+
+Lancer directement via Bash (essayer `python3`, sinon `python`) :
 
 ```bash
-pandoc fichier.md -o fichier.pdf --pdf-engine=xelatex -V geometry:margin=2.5cm -V lang=fr -V mainfont="Segoe UI" -H <fichier_tex>
+python3 ~/.claude/skills/pdf/pdf-check.py "<chemin/fichier.md>" "<memory_dir>" "<repo_root>"
 ```
 
-Le fichier `.tex` inclus via `-H` est injecté dans le préambule LaTeX. Il permet de personnaliser la mise en forme (listes, espacement, couleurs, etc.) sans modifier le markdown source.
+- `<memory_dir>` : répertoire mémoire projet Claude (ex : `~/.claude/projects/<project-id>/memory`)
+- `<repo_root>` : racine du dépôt courant
 
-## Résolution du fichier .tex
+## Étape 2 : Réponse à l'utilisateur
 
-Ordre de priorité (le premier trouvé l'emporte, pas de merge) :
+Interpréter la sortie du script **sans la montrer** :
 
-1. **Surcharge document** : `<nom_du_md>.tex` dans le même répertoire que le fichier markdown (ex : `rapport.md` → `rapport.tex`)
-2. **Surcharge projet** : `overrides.tex` à la racine du dépôt courant
-3. **Défaut global** : `~/.claude/skills/pdf/overrides.tex`
+1. **FIRST_RUN=false ET VIOLATIONS=none** : lancer directement la conversion.
 
-## Première conversion d'un projet
+2. **VIOLATIONS présentes** : lister chaque violation, ne PAS lancer pandoc, proposer les corrections. Ne corriger qu'après accord explicite.
 
-Lors de la **première** demande de conversion PDF dans un projet (vérifier en mémoire projet si le flag `pdf_first_run_done` existe) :
+3. **FIRST_RUN=true ET TEX_SOURCE=global ET VIOLATIONS=none** : analyser TEX_CONTENT, décrire en une phrase concise en langage courant ce qu'il fait (ne jamais montrer le code LaTeX). Introduire par « La mise en page qui sera appliquée inclut ... ». Puis demander :
+   - **OBLIGATOIRE** : utiliser l'outil `AskUserQuestion` (ne JAMAIS poser cette question en texte libre). Paramètres :
+     - `question` : « La mise en page qui sera appliquée inclut : {description}. Souhaitez-vous personnaliser la mise en forme ? »
+     - `header` : « Mise en page »
+     - `multiSelect` : false
+     - `options` :
+       - label: « Fichier » / description: « Surcharge .tex dédiée à ce document »
+       - label: « Projet » / description: « Surcharge overrides.tex pour tout le dépôt »
+       - label: « Défaut » / description: « Lancer la conversion telle quelle »
+   - Après la réponse, enregistrer le flag `pdf_first_run_done:<nom_fichier.md>` en mémoire projet.
 
-1. Exécuter la validation markdown (section ci-dessous)
-2. Si la résolution du `.tex` aboutit au **défaut global** (aucune surcharge document ni projet trouvée) :
-   - Lire le fichier `overrides.tex` résolu, analyser les commandes LaTeX qu'il contient, et décrire à l'utilisateur en langage clair ce qu'elles font
-   - Demander : « Souhaitez-vous adapter la mise en forme pour ce projet ou ce document ? »
-     - **Projet** : créer `overrides.tex` à la racine du dépôt
-     - **Document** : créer `<nom_du_md>.tex` à côté du fichier markdown
-     - **Défaut** : utiliser `overrides.tex` tel quel
-3. Après la réponse de l'utilisateur, enregistrer le flag `pdf_first_run_done` en mémoire projet pour ce fichier markdown
-4. Procéder à la conversion
+4. **FIRST_RUN=true ET TEX_SOURCE!=global** : enregistrer le flag et lancer la conversion.
 
-## Règles markdown pour pandoc/xelatex
+## Étape 3 : Conversion
 
-- Pas de caractères Unicode box-drawing dans les blocs de code (ASCII uniquement : `+`, `-`, `|`)
-- Ligne vide obligatoire entre un paragraphe et une liste (puces ou numérotée)
-- Les blocs triple backtick ne font pas de line-break automatique — casser les lignes longues manuellement
-- Les accents dans les blocs de code peuvent poser problème avec certaines polices mono
-
-## Validation du markdown avant conversion
-
-**Avant** de lancer la commande pandoc, analyser le fichier markdown source et vérifier chacune des règles de la section [Règles markdown pour pandoc/xelatex](#règles-markdown-pour-pandocxelatex) ci-dessus.
-
-**Comportement** :
-- Si **aucune violation** : procéder directement à la conversion
-- Si **violations détectées** : lister chaque violation (numéro de ligne, règle enfreinte, extrait concerné), **ne pas lancer pandoc**, et proposer les corrections à l'utilisateur. Ne corriger qu'après accord explicite
+```bash
+pandoc "<fichier.md>" -o "<fichier.pdf>" --pdf-engine=xelatex -V geometry:margin=2.5cm -V lang=fr -V mainfont="Segoe UI" -H "<TEX_FILE>"
+```
