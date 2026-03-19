@@ -4,5 +4,18 @@
     "command": "bash /c/Users/emman/.claude/statusline-command.sh"
   },
   "language": "français",
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /c/Users/emman/.claude/guard-destructive.sh"
+          }
+        ]
+      }
+    ]
+  }
 }
