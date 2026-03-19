@@ -42,6 +42,10 @@ La configuration Claude est synchronisée via le dépôt `~/claude-config`.
 - Au début de chaque session, exécuter `bash ~/claude-config/status.sh` et proposer `/claude-sync` si nécessaire.
 - Après toute modification de la config ou pour synchroniser depuis une autre machine, utiliser la commande `/claude-sync` (synchronisation bidirectionnelle : commit+push local → pull remote → apply).
 
+# Production de PDF
+
+Production via pandoc + xelatex. Les instructions détaillées sont dans le skill `pdf` (auto-détecté).
+
 # MCP Dart
 
 Le MCP Dart ne doit **JAMAIS** être utilisé (bug connu : les appels MCP bloquent indéfiniment côté Claude Code, voir https://github.com/anthropics/claude-code/issues/22451).
