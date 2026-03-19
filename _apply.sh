@@ -15,13 +15,13 @@ FILES=(
   "settings.json"
   "mcp.json"
   "statusline-command.sh"
-  "guard-destructive.sh"
 )
 
 # Dossiers à synchroniser (miroir complet)
 DIRS=(
   "commands"
   "skills"
+  "scripts"
 )
 
 # Fichiers nécessitant une substitution de chemins
