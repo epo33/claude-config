@@ -20,6 +20,7 @@ Ce document définit les conventions de rédaction appliquées aux documents des
 - Les tirets cadratins restent acceptables dans les **titres de sections** comme séparateur structurel (ex : `## Section — Sous-titre`).
 - Utiliser la virgule pour les incises courantes. Réserver les parenthèses aux apartés qui relèveraient d'une note de bas de page.
 - **INTERDIT : virgule avant les conjonctions de coordination « et », « ou », « ni », « mais ».**
+- **INTERDIT : conjonction de coordination en début de phrase.** « Et », « Mais », « Or », « Donc » ne commencent jamais une phrase. Ce sont des conjonctions : elles relient au sein d'une même phrase (virgule, point-virgule) ou s'intègrent dans la phrase suivante sans la commencer. Le pattern « phrase. Et phrase. » est un calque de l'anglais rhétorique, pas du français écrit.
 
 ## 2. Typographie française
 
