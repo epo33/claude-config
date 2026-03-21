@@ -1,43 +1,23 @@
 ---
 name: redaction-epo
-description: "Relecture et correction de documents destinés à être émis (CR, courriels, rapports, recommandations). Applique les conventions de rédaction EPO : style, typographie française, registre soutenu."
+description: "Conventions de rédaction EPO : style, typographie française, registre soutenu. Charge les consignes pour guider la rédaction de documents destinés à être émis."
+user-invocable: true
 ---
 
-Use this skill when the user explicitly invokes `/redaction-epo` on a document.
+Quand ce skill est invoqué (`/redaction-epo`), lire et charger les règles définies dans `prompt.md` (même répertoire que ce fichier). Ces règles s'appliquent ensuite à toute rédaction ou modification de document dans la suite de la conversation.
 
-**Style de réponse** :
-- Ne JAMAIS modifier le document sans validation explicite de l'utilisateur.
-- Présenter l'analyse de façon structurée puis attendre l'aval.
+## Comportement par défaut
 
-## Étape 1 : Lire le document cible
+- Appliquer les consignes de `prompt.md` à tout texte rédigé ou modifié dans la conversation.
 
-Lire intégralement le document passé en paramètre ou le document actuellement ouvert dans l'IDE.
+## Correction sur demande
 
-## Étape 2 : Appliquer les règles de `prompt.md`
+Si l'utilisateur demande explicitement une relecture ou correction d'un document existant :
 
-Analyser le document selon les règles définies dans `prompt.md` (même répertoire que ce fichier).
+Présenter les corrections une par une. Pour chaque correction :
 
-## Étape 3 : Présenter l'analyse
+1. Citer le passage original en signalant clairement la partie problématique (gras, soulignement ou autre mise en évidence).
+2. Proposer la correction en signalant clairement la partie modifiée.
+3. Pour les reformulations (style, vocabulaire, structure), proposer 2-3 variantes en texte libre. Chaque variante doit être lisible en entier avec la partie modifiée clairement signalée.
 
-### Corrections directes (typo, orthographe, accords)
-
-Lister les corrections factuelles sous forme de tableau :
-
-| Ligne | Original | Correction |
-|-------|----------|------------|
-| ... | ... | ... |
-
-### Suggestions de reformulation (style, vocabulaire, structure)
-
-Pour chaque passage améliorable, utiliser `AskUserQuestion` avec :
-- `question` : citation du passage original + 2-3 variantes proposées
-- `options` : chaque variante en option + une option « Conserver l'original »
-- `multiSelect` : false
-
-Si le document est long (> 50 lignes), proposer un découpage par section avant de commencer.
-
-## Étape 4 : Appliquer les modifications
-
-Après validation, appliquer toutes les corrections et les choix de reformulation.
-
-Ajouter le marqueur `<!-- redaction-epo -->` en fin de document s'il n'est pas déjà présent.
+Appliquer chaque modification au fur et à mesure, après validation de l'utilisateur. Ne JAMAIS modifier sans validation préalable.

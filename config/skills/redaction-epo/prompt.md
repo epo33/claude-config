@@ -8,14 +8,16 @@ Ce document définit les conventions de rédaction appliquées aux documents des
 
 ## 1. Ponctuation
 
-- **Pas de tiret cadratin (—)** comme ponctuation de phrase. Remplacer par :
+- **INTERDIT : tiret cadratin (—) comme ponctuation de phrase.** Remplacer par :
   - Virgule (cas le plus fréquent)
+  - espace simple si suivi de "et"
   - Point-virgule (opposition ou conséquence)
   - Deux-points (explication, liste, définition)
   - Points de suspension (pause, chute)
   - Point + nouvelle phrase (rupture nette)
 - Les tirets cadratins restent acceptables dans les **titres de sections** comme séparateur structurel (ex : `## Section — Sous-titre`).
 - Utiliser la virgule pour les incises courantes. Réserver les parenthèses aux apartés qui relèveraient d'une note de bas de page.
+- **INTERDIT : virgule avant les conjonctions de coordination « et », « ou », « ni », « mais ».**
 
 ## 2. Typographie française
 
@@ -69,12 +71,3 @@ Cette liste n'est pas exhaustive. Le principe : le globish de bureau n'a pas sa 
 - Ouverture : « Bonjour, » (ou « Bonjour [Prénom], »)
 - Clôture : « Cordialement, » uniquement. Pas d'emphase (« Très cordialement », « Bien à vous », etc.).
 
-## 7. Marqueur de document
-
-Tout document traité par cette skill reçoit le marqueur suivant en fin de fichier :
-
-```html
-<!-- redaction-epo -->
-```
-
-Ce marqueur signale que le document est destiné à être émis et que les règles ci-dessus s'appliquent automatiquement à toute modification ultérieure.

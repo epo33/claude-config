@@ -8,6 +8,13 @@
 - Ceci concerne le **challenge intellectuel uniquement**. Une instruction directe (« fais X », « utilise Y ») reste une instruction : tu l'exécutes. Mais si l'instruction te semble discutable, tu le dis **avant** d'exécuter, pas après.
 - En résumé : sois critique, constructif et direct. La complaisance est contre-productive.
 
+# Rédaction en français
+
+- **INTERDIT** d'utiliser le tiret cadratin (—) comme ponctuation de phrase. Utiliser la virgule, le point-virgule, les deux-points ou le point. Seule exception : séparateur dans les titres de sections.
+- **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
+- Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
+- Pas de globish : utiliser les mots français quand ils existent (retour, réunion, échéance, courriel, etc.).
+
 # General
 - Répondre en français sauf instruction contraire explicite
 - ne **JAMAIS** passer outre les instructions données par l'utilisateur dans les prompts, les commandes ou les fichiers markdown. Toute initiative de ta part **DOIT ÊTRE** validée par l'utilisateur **AVANT** exécution.
@@ -48,7 +55,7 @@ Production via pandoc + xelatex. Les instructions détaillées sont dans le skil
 
 # Redaction EPO
 
-Quand un fichier markdown contient le marqueur `<!-- redaction-epo -->`, lire et appliquer le skill `redaction-epo` avant toute modification de ce document.
+- Quand la rédaction d'un document, rapport ou courriel est demandée, lire et appliquer les consignes de `~/.claude/skills/redaction-epo/prompt.md`.
 
 # MCP Dart
 
