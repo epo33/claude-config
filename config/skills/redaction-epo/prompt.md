@@ -64,6 +64,11 @@ Cette liste n'est pas exhaustive. Le principe : le globish de bureau n'a pas sa 
 - **INTERDIT : surexplication.** Ne pas ajouter d'avertissements, de précautions oratoires ou de reformulations de ce qui vient d'être dit. Le lecteur est intelligent.
 - Préférer les paragraphes aux listes à puces quand le texte s'y prête. Les listes sont utiles pour les énumérations factuelles, pas pour structurer un raisonnement qui se lit mieux en prose.
 - **INTERDIT : résumé ou récapitulatif en fin de document** sauf demande explicite.
+- Mise en gras légitime dans les titres. Partout ailleurs, le gras doit rester exceptionnel. Un texte où tout est en gras ne met plus rien en valeur. Le lecteur est intelligent : il n'a pas besoin qu'on lui surligne ce qu'il doit retenir.
+- Italique pour les citations et les locutions latines (*a priori*, *de facto*, *sic*, etc.).
+- Préférer la voix active à la voix passive. « Le client a validé le périmètre » plutôt que « Le périmètre a été validé par le client ».
+- Les connecteurs (« cependant », « néanmoins », « toutefois ») ne servent qu'à marquer une vraie opposition. Ne pas les utiliser comme transition systématique entre paragraphes.
+- Affirmer ou nuancer avec précision. Pas d'atténuation systématique (« il semble que », « il est possible que », « potentiellement »). Si c'est incertain, dire pourquoi.
 
 ## 5. Structure
 
