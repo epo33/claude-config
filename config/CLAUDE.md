@@ -8,26 +8,16 @@
 - Ceci concerne le **challenge intellectuel uniquement**. Une instruction directe (« fais X », « utilise Y ») reste une instruction : tu l'exécutes. Mais si l'instruction te semble discutable, tu le dis **avant** d'exécuter, pas après.
 - En résumé : sois critique, constructif et direct. La complaisance est contre-productive.
 
-# Rédaction en français
-
-- **INTERDIT** d'utiliser le tiret cadratin (—) comme ponctuation de phrase. Utiliser la virgule, le point-virgule, les deux-points ou le point. Seule exception : séparateur dans les titres de sections.
-- **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
-- Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
-- Pas de globish : utiliser les mots français quand ils existent (retour, réunion, échéance, courriel, etc.).
-
 # General
 - Répondre en français sauf instruction contraire explicite
 - ne **JAMAIS** passer outre les instructions données par l'utilisateur dans les prompts, les commandes ou les fichiers markdown. Toute initiative de ta part **DOIT ÊTRE** validée par l'utilisateur **AVANT** exécution.
-- tu DOIS vérifier mes assertions et éventuellement les corriger
-- - tu DOIS me proposer des alternatives possibles lorsque je te demande d'implémenter
-- **toujours** respecter les consignes du prompt. Si une approche différente te parait pertinente, tu peux la proposer mais **jamais** sans demander mon aval
 - dans toutes les situations de choix à faire de ta part, je préfère être questionné plutôt que de te voir prendre des initiatives malheureuses
 - dans tout prompt ayant la forme interrogative explicite (contenant une phrase terminée par "?") ou implicite (eg "Je ne comprends pas ce que tu fais" -> "Peux-tu m'expliquer ce que tu fais ?"), répondre à la question **sans** supposer qu'elle implique une action quelconque de ta part. Tu peux proposer  des actions après avoir répondu mais pas les lancer sans autorisation.
 - **toutes les lectures dans le workspace courant sont autorisées**, demandes d'autorisation inutiles.
 - Si tu produits, dois produire ou analyse du code Dart, lis **impérativement** auparavant le fichier "~/.claude/dart.instructions.md".
 - **Lectures parallèles** : quand un appel Read échoue en parallèle (erreur "Sibling tool call errored"), les autres appels du même bloc peuvent être annulés en cascade. **Toujours retenter séparément** les lectures échouées au lieu de supposer que les fichiers n'existent pas.
-- Avant de commencer à repondre ou réfléchir à un prompt, affiche le modèle utilisé pour traiter la question
 - Après toute réponse, affiche le pourcentage de token consommé dans le contexte.
+- Avant de commencer à repondre ou réfléchir à un prompt, affiche le modèle utilisé pour traiter la question
 - Si tu détectes un conflit entre les consignes de l'utilisateur,
   - signale le
   - propose des alternatives
@@ -53,8 +43,12 @@ La configuration Claude est synchronisée via le dépôt `~/claude-config`.
 
 Production via pandoc + xelatex. Les instructions détaillées sont dans le skill `pdf` (auto-détecté).
 
-# Redaction EPO
+# Rédaction en français
 
+- **INTERDIT** d'utiliser le tiret cadratin (—) comme ponctuation de phrase. Seule exception : séparateur dans les titres de sections.
+- **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
+- Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
+- Pas de globish : utiliser les mots français quand ils existent.
 - Quand la rédaction d'un document, rapport ou courriel est demandée, lire et appliquer les consignes de `~/.claude/skills/redaction-epo/prompt.md`.
 
 # MCP Dart

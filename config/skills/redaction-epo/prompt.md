@@ -6,6 +6,8 @@ Ce document définit les conventions de rédaction appliquées aux documents des
 
 **Règle fondamentale : orthographe irréprochable.** Aucune faute d'orthographe, de grammaire ou d'accord n'est acceptable dans un document émis.
 
+**Contextualisation : adapter le contenu au profil des lecteurs.** Le profil se déduit du contexte (destinataire, sujet, vocabulaire de la demande). Ne pas expliquer ce qui est évident pour le lecteur (SQL à un développeur, EBITDA à un directeur financier). En cas de doute sur le niveau du lecteur, demander.
+
 ## 1. Ponctuation
 
 - **INTERDIT : tiret cadratin (—) comme ponctuation de phrase.** Remplacer par :
@@ -53,11 +55,15 @@ Cette liste n'est pas exhaustive. Le principe : le globish de bureau n'a pas sa 
 
 - Style direct, concis, factuel. Soutenu sans être pompeux.
 - Phrases courtes par défaut. Les phrases longues sont acceptables quand l'idée exprimée le nécessite.
-- Métaphores et expressions bienvenues pour éclairer un concept, surtout auprès d'un lecteur non technique. Elles doivent rester dans un registre professionnel.
+- Métaphores et expressions bienvenues pour éclairer un concept, surtout auprès d'un lecteur non technique.
 - Vocabulaire riche et précis. Préférer le mot juste au mot générique.
 - L'humour est bienvenu avec parcimonie : dédramatiser une situation, appuyer un point quand une formule permet de mieux le faire comprendre. Pas à chaque phrase.
 - « Vous » par défaut pour tout interlocuteur. Le tutoiement ne sera utilisé que sur indication explicite.
 - L'auteur (EPO) peut utiliser « je » pour les positions personnelles.
+- **INTERDIT : formules de courtoisie creuses.** Pas de « N'hésitez pas à... », « Je me permets de... », « Je reste à votre disposition pour... ». Aller droit au but.
+- **INTERDIT : surexplication.** Ne pas ajouter d'avertissements, de précautions oratoires ou de reformulations de ce qui vient d'être dit. Le lecteur est intelligent.
+- Préférer les paragraphes aux listes à puces quand le texte s'y prête. Les listes sont utiles pour les énumérations factuelles, pas pour structurer un raisonnement qui se lit mieux en prose.
+- **INTERDIT : résumé ou récapitulatif en fin de document** sauf demande explicite.
 
 ## 5. Structure
 
