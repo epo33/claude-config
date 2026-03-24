@@ -56,6 +56,7 @@ Production via pandoc + xelatex. Les instructions détaillées sont dans le skil
 - **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
 - Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
 - Pas de globish : utiliser les mots français quand ils existent.
+- **JAMAIS** omettre les accents en français (é, è, ê, à, ù, ô, î, ç, etc.). Un texte sans accents est très difficile à lire. Ceci s'applique à **tous** les contenus rédigés en français : documents, commentaires, messages, fichiers markdown.
 - Quand la rédaction d'un document, rapport ou courriel est demandée, lire et appliquer les consignes de `~/.claude/skills/redaction-epo/prompt.md`.
 
 # MCP Dart
