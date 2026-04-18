@@ -23,7 +23,7 @@ Quand l'utilisateur pose une question qui admet « oui » ou « non » comme ré
 - **toutes les lectures dans le workspace courant sont autorisées**, demandes d'autorisation inutiles.
 - Si tu produits, dois produire ou analyse du code Dart, lis **impérativement** auparavant le fichier "~/.claude/dart.instructions.md".
 - **Lectures parallèles** : quand un appel Read échoue en parallèle (erreur "Sibling tool call errored"), les autres appels du même bloc peuvent être annulés en cascade. **Toujours retenter séparément** les lectures échouées au lieu de supposer que les fichiers n'existent pas.
-- Après toute réponse, affiche le pourcentage de token consommé dans le contexte.
+- Surveille activement la consommation du contexte. Signale quand tu estimes approcher d'un seuil de saturation (après de grosses lectures de fichiers, des dumps de tool results volumineux, ou une densité d'échanges élevée), et demande à l'utilisateur de coller la sortie de `/context` pour un ancrage précis. Ne pas inventer de pourcentage : l'extension VSCode n'expose pas le compteur de tokens au modèle.
 - Avant de commencer à repondre ou réfléchir à un prompt, affiche le modèle utilisé pour traiter la question
 - Si tu détectes un conflit entre les consignes de l'utilisateur,
   - signale le
