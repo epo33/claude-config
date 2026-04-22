@@ -15,6 +15,25 @@ Quand l'utilisateur pose une question qui admet « oui » ou « non » comme ré
 2. **Puis** formuler la conclusion, qui doit découler des faits listés.
 3. Si la liste factuelle est vide ou non vérifiable, le dire explicitement : « Je n'ai rien vérifié, je ne peux pas confirmer. »
 
+# Accents français — règle absolue (code inclus)
+
+**TOUT** texte rédigé en français **DOIT** porter ses accents. Aucune exception, aucun contexte dérogatoire.
+
+Cette règle s'applique **identiquement** :
+- aux documents, rapports, courriels, fichiers markdown,
+- **au code source** : commentaires, docstrings, messages de log, chaînes de caractères, littéraux d'interface, messages d'erreur, messages de commit, noms dans la documentation.
+
+**Avant chaque écriture de texte français** (y compris dans `Write`/`Edit` sur du code), vérifier activement la présence des accents. Le biais par défaut (produire de l'ASCII dans du code) est **incorrect** et doit être contré explicitement.
+
+Exemples **interdits** → attendus :
+- `// traitement des donnees` → `// traitement des données`
+- `// recuperer la valeur` → `// récupérer la valeur`
+- `throw "Echec de la creation"` → `throw "Échec de la création"`
+- `log("Operation terminee")` → `log("Opération terminée")`
+- `/// Methode appelee apres l'initialisation` → `/// Méthode appelée après l'initialisation`
+
+Règle de contrôle : si un mot français écrit sans accent **devrait** en porter un (`e`→`é`/`è`/`ê`, `a`→`à`/`â`, `u`→`ù`/`û`, `o`→`ô`, `i`→`î`, `c`→`ç`), c'est une erreur à corriger avant de valider l'édition. Ne jamais invoquer la contrainte d'encodage du fichier comme excuse : UTF-8 est la norme.
+
 # General
 - Répondre en français sauf instruction contraire explicite
 - ne **JAMAIS** passer outre les instructions données par l'utilisateur dans les prompts, les commandes ou les fichiers markdown. Toute initiative de ta part **DOIT ÊTRE** validée par l'utilisateur **AVANT** exécution.
@@ -56,7 +75,6 @@ Production via pandoc + xelatex. Les instructions détaillées sont dans le skil
 - **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
 - Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
 - Pas de globish : utiliser les mots français quand ils existent.
-- **JAMAIS** omettre les accents en français (é, è, ê, à, ù, ô, î, ç, etc.). Un texte sans accents est très difficile à lire. Ceci s'applique à **tous** les contenus rédigés en français : documents, commentaires, messages, fichiers markdown.
 - Quand la rédaction d'un document, rapport ou courriel est demandée, lire et appliquer les consignes de `~/.claude/skills/redaction-epo/prompt.md`.
 
 # MCP Dart
