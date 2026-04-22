@@ -2,6 +2,8 @@
 applyTo: "**/*.dart"
 ---
 
+> Les règles générales d'écriture de code (tous langages) sont dans `~/.claude/CLAUDE.md`, section « Écriture de code — règles générales ». Ce fichier ne contient que les règles **spécifiques à Dart**.
+
 # Identifiants
 
 ## Conventions de nommage
@@ -15,9 +17,6 @@ applyTo: "**/*.dart"
 - Acronymes de plus de 2 lettres: capitaliser comme un mot normal (`HttpRequest`, pas `HTTPRequest`)
 - Acronymes de 2 lettres: conserver la capitalisation anglaise (`ID`, `UI`, `TV`)
 
-## Paramètres inutilisés
-- Utiliser `_` pour les paramètres de callback inutilisés
-
 # Imports
 
 Ordre avec lignes vides entre sections:
@@ -28,13 +27,10 @@ Ordre avec lignes vides entre sections:
 
 Chaque section triée alphabétiquement.
 
-# Formatage
+# Formatage (spécifique Dart)
 
-- Utiliser `dart format` comme standard.
 - Maximum 80 caractères par ligne.
-- Toujours utiliser des accolades dans les structures de contrôle (sauf if simple sans else sur une seule ligne).
-- Utiliser SYSTEMATIQUEMENT le guillemet double (`"`) pour les chaînes de caractères, SAUF si la chaîne contient un guillemet double.
-- Préférer la syntaxe des fonctions fléchées pour les méthodes simples:
+- Préférer la syntaxe des fonctions fléchées pour les méthodes simples :
 ```dart
 // Incorrect
 int add(int a, int b) {
@@ -43,13 +39,10 @@ int add(int a, int b) {
 // Correct
 int add(int a, int b) => a + b;
 ```
-- Éviter les sauts de ligne dans l'implémentation des méthodes. Si une ligne vide est insérée, c'est souvent le signe d'une méthode trop longue ou qui fait trop de choses.
 
-- Une classe privée ne doit pas définir de membres privés (redondant).
+# Typage (exemples Dart)
 
-# Typage
-
-Ne pas typer explicitement les variables ou paramètres où le type est évident:
+Exemples d'application de la règle générale « ne pas typer quand le type est évident » :
 ```dart
 // type facultatif, peut être écrit var count = 0;
 int count = 0;
@@ -81,21 +74,12 @@ enum Status {
 final Status test = .active;
 ```
 
-# Documentation
+# Documentation (exemple Dart)
 
-## Contenu d'un docComment
-
-Lors de la rédaction de docComments : 
-- **TOUJOURS** expliquer COMMENT UTILISER le code (quoi, quand, pourquoi), - 
-- **JAMAIS** expliquer COMMENT EST IMPLÉMENTÉ le code (détails internes, algorithmes),
-- Les détails d'implémentation vont dans des commentaires normaux, pas dans des docComments.
-
-## Où ajouter un docComment
-- Ajouter un docComment à une classe, méthode ou propriété SI ET SEULEMENT SI son UTILISATION N'EST PAS ÉVIDENTE à partir de son nom ou de sa signature. Par exemple, une méthode `calculateTotalPrice()` n'a pas besoin d'un docComment pour expliquer ce qu'elle fait, mais une méthode `calculate()` pourrait en avoir besoin pour préciser ce qu'elle calcule.
+Application de la règle générale « pas de commentaire inutile, docComment seulement si l'usage n'est pas évident ». Contre-exemple à ne pas reproduire :
 
 ```dart
-// Incorrect
-
+// Incorrect — tout ce qui suit est redondant avec les noms
 /// Utilisateur de l'application
 class User {
   /// Prénom de l'utilisateur
@@ -107,50 +91,33 @@ class User {
 
   /// Crée un utilisateur à partir d'un JSON
   User.fromJson(Map<String, dynamic> json)
-      : firstName = json['firstName'],
-        lastName = json['lastName'];
+      : firstName = json["firstName"],
+        lastName = json["lastName"];
 
   /// Convertit l'utilisateur en JSON
-  Map<String, dynamic> toJson() {
-    return {
-      'firstName': firstName,
-      'lastName': lastName,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        "firstName": firstName,
+        "lastName": lastName,
+      };
 }
 
-// Correct
-
+// Correct — aucun docComment, les noms suffisent
 class User {
   User(this.firstName, this.lastName);
 
   String firstName;
-
   String lastName;
 
   User.fromJson(Map<String, dynamic> json)
       : firstName = json["firstName"],
         lastName = json["lastName"];
 
-  Map<String, dynamic> toJson() {
-    return {
-      "firstName": firstName,
-      "lastName": lastName,
-    };
-  }
+  Map<String, dynamic> toJson() => {
+        "firstName": firstName,
+        "lastName": lastName,
+      };
 }
-
 ```
-
-## Commentaires "normaux"
-
-- Utiliser des commentaires normaux (// ou /* */) pour expliquer les détails d'implémentation, les algorithmes, les choix techniques, etc. Ces commentaires sont destinés aux développeurs qui lisent le code, pas aux utilisateurs de la classe ou de la méthode.
-- Les commentaires normaux peuvent être placés à l'intérieur des méthodes pour expliquer des étapes spécifiques, ou au-dessus de blocs de code pour expliquer leur but.
-- A utiliser **UNIQUEMENT** lorsque : 
-  - le code n'est pas suffisamment clair par lui-même (probablement à refactoriser plutôt que commenter)
-  - pour citer des références techniques e.g. : 
-    - "Cette implémentation est basée sur l'algorithme de Dijkstra" 
-    - "voir https://datatracker.ietf.org/doc/html/rfc5322".
 
 # Ordonnancement des lignes de code dans la définition d'une classe
 
@@ -189,12 +156,3 @@ Widget build(BuildContext context) {
   );
 }
 ```
-
-# Consignes 
-
-**Expressions ternaires, if/else:**
-- Préférer les vérifications positives/nullables dans les conditions ternaires ou clause d'un if
-- Utiliser `value == null ? ... : ...` plutôt que `value != null ? ... : ...`
-- Utiliser `if (value == null) {...} else {...}` plutôt que `if (value != null) {...} else {...}`
-- Cela améliore la lisibilité en évitant les négations : if (négation) => else = négation de négation)
-- Exemple: `docId == null ? "indexed" : "reindexed"` au lieu de `docId != null ? "reindexed" : "indexed"`

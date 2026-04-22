@@ -15,6 +15,67 @@ Quand l'utilisateur pose une question qui admet « oui » ou « non » comme ré
 2. **Puis** formuler la conclusion, qui doit découler des faits listés.
 3. Si la liste factuelle est vide ou non vérifiable, le dire explicitement : « Je n'ai rien vérifié, je ne peux pas confirmer. »
 
+# Écriture de code — règles générales (tous langages)
+
+**Ces règles s'appliquent à CHAQUE `Write` et `Edit` sur du code, quel que soit le langage.** Les règles spécifiques à un langage (Dart, etc.) viennent s'ajouter via les fichiers d'instructions dédiés.
+
+## Commentaires et documentation
+
+- **Par défaut, n'écrire AUCUN commentaire.** Un commentaire n'est justifié que si la compréhension du code ne peut pas passer par le nom des identifiants, la signature ou la structure.
+- **INTERDIT** : commentaires qui paraphrasent le code (`// incrémente i`, `// boucle sur les éléments`), qui répètent le nom de la fonction, qui décrivent « ce que fait » du code déjà lisible.
+- **INTERDIT** : commentaires qui référencent le contexte de la tâche courante (`// ajouté pour le ticket X`, `// retiré le flag Y`, `// fix demandé par…`). Ces informations appartiennent au message de commit.
+- Un commentaire n'est acceptable que pour : une contrainte cachée, un invariant non évident, un contournement de bug précis, une référence technique externe (RFC, article, algorithme nommé), un comportement qui surprendrait un lecteur.
+- **Docstrings / docComments** : expliquent **comment utiliser** (quoi, quand, pourquoi), **jamais comment c'est implémenté**. N'en ajouter que si l'usage n'est pas évident à partir du nom et de la signature. Les détails d'implémentation vont dans des commentaires normaux, pas dans des docComments.
+- Si un commentaire semble nécessaire parce que le code n'est « pas clair », la bonne réponse est **refactoriser**, pas commenter.
+
+## Formatage
+
+- Utiliser le formateur officiel du langage comme standard (`dart format`, `prettier`, `ruff format`, `gofmt`, etc.).
+- Toujours utiliser des accolades / blocs explicites dans les structures de contrôle, sauf forme courte sans alternative (`if` simple sans `else` sur une seule ligne).
+- **Éviter les lignes vides dans l'implémentation d'une méthode.** Une ligne vide au milieu d'un corps de fonction est le signal d'une méthode trop longue ou qui fait trop de choses : refactoriser plutôt qu'aérer.
+
+## Chaînes de caractères
+
+- **Guillemet double (`"`) systématique** dans les langages qui l'autorisent (Dart, JS/TS, Java, C#, Go, Rust, etc.).
+- Raison : le guillemet simple (`'`) est courant dans les chaînes françaises (apostrophes). Éviter d'avoir à l'échapper.
+- Exception : la chaîne contient un `"` non échappable proprement → utiliser le guillemet simple.
+- Pour les langages où la convention dominante est le guillemet simple (Python : PEP 8 neutre mais `ruff`/`black` imposent le double ; Ruby : simple par défaut) → suivre la convention du langage et du formateur configuré.
+
+## Typage
+
+- Ne pas typer explicitement les variables ou paramètres quand le type est **évident** par inférence (littéral, retour de fonction connu, callback dont la signature est déjà déclarée).
+- Typer explicitement aux frontières publiques : paramètres de fonctions/méthodes publiques, types de retour, champs publics.
+
+## Visibilité
+
+- Une classe privée ne redéclare pas ses membres comme privés (redondant). S'applique à tout langage avec visibilité imbriquée.
+
+## Paramètres inutilisés
+
+- Utiliser `_` (ou la convention équivalente du langage) pour les paramètres de callback inutilisés.
+
+## Expressions conditionnelles — éviter les doubles négations
+
+- Préférer les vérifications **positives** dans les ternaires et les clauses `if/else`.
+- Utiliser `value == null ? A : B` plutôt que `value != null ? B : A`.
+- Utiliser `if (value == null) { … } else { … }` plutôt que `if (value != null) { … } else { … }`.
+- Raison : `if (négation) … else …` force le lecteur à calculer la négation de la négation pour la branche `else`.
+
+## Portée des modifications
+
+- **Ne pas ajouter de code au-delà de ce qui est demandé** : pas de feature flag spéculatif, pas d'abstraction pour un besoin futur hypothétique, pas de refactoring « au passage », pas de helper extrait sans nécessité.
+- **Ne pas ajouter de gestion d'erreur pour des cas qui ne peuvent pas se produire.** Valider uniquement aux frontières du système (entrées utilisateur, API externes).
+- **Ne pas laisser d'implémentation à moitié faite** : si une partie n'est pas terminée, le signaler explicitement dans la réponse plutôt que de committer du code incomplet sans marqueur.
+
+## Contrôle avant validation
+
+Avant chaque `Write`/`Edit` qui touche du code, vérifier :
+1. Aucun commentaire inutile ajouté (voir section « Commentaires et documentation »).
+2. Aucune ligne vide dans le corps des méthodes.
+3. Guillemets doubles pour les chaînes.
+4. Accents présents sur tout texte français (voir section dédiée plus bas).
+5. Aucune modification hors du périmètre demandé.
+
 # Accents français — règle absolue (code inclus)
 
 **TOUT** texte rédigé en français **DOIT** porter ses accents. Aucune exception, aucun contexte dérogatoire.
