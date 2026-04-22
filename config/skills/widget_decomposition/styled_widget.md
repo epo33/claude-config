@@ -1,7 +1,7 @@
 # styled_widget : référence des notations postfix
 
 Package `styled_widget` v0.4.1 —
-sources : `C:\Users\emman\AppData\Local\Pub\Cache\hosted\pub.dev\styled_widget-0.4.1\lib\src\extensions\`
+sources : `~\AppData\Local\Pub\Cache\hosted\pub.dev\styled_widget-0.4.1\lib\src\extensions\`
 
 ## Sur `Widget` (48 méthodes)
 
