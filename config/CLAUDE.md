@@ -22,8 +22,10 @@ Quand l'utilisateur pose une question qui admet « oui » ou « non » comme ré
 ## Commentaires et documentation
 
 - **Par défaut, n'écrire AUCUN commentaire.** Un commentaire n'est justifié que si la compréhension du code ne peut pas passer par le nom des identifiants, la signature ou la structure.
-- **INTERDIT** : commentaires qui paraphrasent le code (`// incrémente i`, `// boucle sur les éléments`), qui répètent le nom de la fonction, qui décrivent « ce que fait » du code déjà lisible.
-- **INTERDIT** : commentaires qui référencent le contexte de la tâche courante (`// ajouté pour le ticket X`, `// retiré le flag Y`, `// fix demandé par…`). Ces informations appartiennent au message de commit.
+- **Avant d'écrire un commentaire, répondre à ces trois questions. Si l'une est « oui », ne pas l'écrire :**
+  1. Le commentaire dit-il **ce que fait** le code (`// incrémente i`, `// boucle sur les éléments`) ? → supprimer, le code suffit.
+  2. Le commentaire référence-t-il la **tâche en cours** (`// ajouté pour le ticket X`, `// fix demandé par…`) ? → mettre dans le message de commit ou la PR.
+  3. Le commentaire décrit-il **quelque chose qui n'est pas sur cette ligne** — un caller, un autre symbole, une version d'API, une condition future, un état du reste du codebase (`// utilisé par FooBar`, `// appelé depuis le flux d'inscription`, `// cohérent avec la v2.3 de l'API`, `// TODO retirer quand ServiceX sera migré`) ? → cette information n'est pas vérifiée par le compilateur ni les tests, elle deviendra fausse silencieusement. Si l'invariant compte, l'encoder dans un test ; sinon, le laisser au commit ou à la PR.
 - Un commentaire n'est acceptable que pour : une contrainte cachée, un invariant non évident, un contournement de bug précis, une référence technique externe (RFC, article, algorithme nommé), un comportement qui surprendrait un lecteur.
 - **Docstrings / docComments** : expliquent **comment utiliser** (quoi, quand, pourquoi), **jamais comment c'est implémenté**. N'en ajouter que si l'usage n'est pas évident à partir du nom et de la signature. Les détails d'implémentation vont dans des commentaires normaux, pas dans des docComments.
 - Si un commentaire semble nécessaire parce que le code n'est « pas clair », la bonne réponse est **refactoriser**, pas commenter.
