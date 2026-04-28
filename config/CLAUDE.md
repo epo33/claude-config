@@ -136,6 +136,7 @@ Production via pandoc + xelatex. Les instructions détaillées sont dans le skil
 
 - **INTERDIT** d'utiliser le tiret cadratin (—) comme ponctuation de phrase. Seule exception : séparateur dans les titres de sections.
 - **INTERDIT** de placer une virgule avant « et », « ou », « ni », « mais ».
+- Marqueurs typographiques (gras, italique, soulignement) : usage **très parcimonieux**. C'est la structure de la phrase et le choix des mots qui doivent porter l'emphase, pas la mise en forme. Réserver ces marqueurs aux cas où l'absence de mise en évidence rendrait le texte ambigu ou ferait manquer une information critique.
 - Typographie française obligatoire : guillemets « », espace insécable avant `:` `;` `!` `?`.
 - Pas de globish : utiliser les mots français quand ils existent.
 - Quand la rédaction d'un document, rapport ou courriel est demandée, lire et appliquer les consignes de `~/.claude/skills/redaction-epo/prompt.md`.
