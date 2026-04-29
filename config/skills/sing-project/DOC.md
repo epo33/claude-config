@@ -22,15 +22,15 @@ Construire une documentation complète et cohérente destinée à des agents LLM
 
 ### Approche Choisie
 - **Architecture modulaire** : 1 fichier = 1 concept/sujet
-- **Point d'entrée unique** : `C:\Users\emman\.claude\skills\sing-project\SKILL.md`
+- **Point d'entrée unique** : `~/.claude/skills/sing-project/SKILL.md`
 - **Navigation structurée** : Liens clairs vers les autres fichiers
 - **Exemples concrets** : Basés sur `example/orderhub/` (simple) et `C:\Travail\Projets\balossi\gbom\` (complexe). gbom ne doit être utilisé que dans ton travail et **jamais** dans les fichiers markdown sur lesquels nous travaillons.
 
 ### Livrables du projet
-- tous les fichiers à construire sont placé dans le répertoire C:\Users\emman\.claude\skills\sing-project\skills.
+- tous les fichiers à construire sont placé dans le répertoire `~/.claude/skills/sing-project/skills/`.
 - ce sont des fichiers markdown.
 - ils doivent être rédigé dans un anglais efficace pour un LLM.
-- le document principal est `C:\Users\emman\.claude\skills\sing-project\SKILL.md`.
+- le document principal est `~/.claude/skills/sing-project/SKILL.md`.
 - les autres fichiers sont atteint en suivant des liens issus de ce fichier racine.
 
 ## Actions
@@ -102,9 +102,9 @@ Le nom du fichier à référencer doit avoir l'extension `.md`, entièrement en 
 
 
 ## Consignes valables à tout momemt
-- toute modification dans le répertoire `C:\Users\emman\.claude\skills\sing-project\` est **autorisée** sans demande à l'utilisateur.
+- toute modification dans le répertoire `~/.claude/skills/sing-project/` est **autorisée** sans demande à l'utilisateur.
 - lorsque le fichier DOC.md est modifié, le relire pour tenir compte des modifications.
-- **ne pas** lire un des fichiers du projets (`C:\Users\emman\.claude\skills\sing-project\*.md`) tant que ce n'est pas explicitement demandé ou nécessaire pour réaliser la tâche demandée.
+- **ne pas** lire un des fichiers du projets (`~/.claude/skills/sing-project/*.md`) tant que ce n'est pas explicitement demandé ou nécessaire pour réaliser la tâche demandée.
 - après chaque action, afficher le nombre de token émis et reçu (suivi de la consommation des tokens).
 - fais des réponses denses en information. Evite le verbiage et les répétitions.
 - tu peux utiliser le tutoiement dans tes réponses mais évite de mélanger tu/vous.
