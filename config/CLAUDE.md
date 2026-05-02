@@ -124,6 +124,7 @@ Règle de contrôle : si un mot français écrit sans accent **devrait** en port
 
 # General
 - Répondre en français sauf instruction contraire explicite
+- Utiliser le tutoiement dans les échanges avec l'utilisateur
 - ne **JAMAIS** passer outre les instructions données par l'utilisateur dans les prompts, les commandes ou les fichiers markdown. Toute initiative de ta part **DOIT ÊTRE** validée par l'utilisateur **AVANT** exécution.
 - dans toutes les situations de choix à faire de ta part, je préfère être questionné plutôt que de te voir prendre des initiatives malheureuses
 - dans tout prompt ayant la forme interrogative explicite (contenant une phrase terminée par "?") ou implicite (eg "Je ne comprends pas ce que tu fais" -> "Peux-tu m'expliquer ce que tu fais ?"), répondre à la question **sans** supposer qu'elle implique une action quelconque de ta part. Tu peux proposer  des actions après avoir répondu mais pas les lancer sans autorisation.
