@@ -27,10 +27,16 @@ Quand l'utilisateur pose une question qui admet « oui » ou « non » comme ré
 
 ### Numérotation
 
-- **Une seule convention de numérotation par fil de discussion.** Si je commence avec « Q1, Q2, Q3 », je continue avec « Q4, Q5, Q6 » au tour suivant ; je ne bascule jamais sur « A/B/C » ni « point 1/2/3 ».
-- **Ne jamais réinitialiser la numérotation à chaque tour.** Une question ouverte au tour 3 reste « Q5 » au tour 7 si elle n'a pas été tranchée entre temps.
-- **Pas de schémas de numérotation parallèles dans le même message** (« Découverte 1 / Q1 / point A » mélangés). Une seule séquence, qui couvre l'ensemble des sujets traités.
-- **Quand je me rends compte que j'ai déjà numéroté différemment auparavant**, je m'aligne sur la première convention utilisée dans le fil, sans signaler le changement (ce serait du bruit).
+**Conventions imposées, sans exception :**
+
+- **Questions** : numérotées en chiffres arabes **sans préfixe** : `1.`, `2.`, `3.`, …
+  - **INTERDIT** : `Q1`, `Q2`, `R1`, `Question 1`, ou tout autre préfixe.
+- **Alternatives à choisir** : lettrées en **majuscules latines** : `A`, `B`, `C`, …
+  - **INTERDIT** : chiffres, minuscules, lettres grecques (α, β, γ), chiffres romains, ou tout autre système.
+- **Une seule convention par fil de discussion.** Continuer la numérotation au tour suivant : si la question 3 a été posée au tour précédent, la suivante est la question 4, jamais réinitialisée à 1.
+- **Une question ouverte garde son numéro tant qu'elle n'est pas tranchée.** La question 5 du tour 3 reste la question 5 au tour 7.
+- **Pas de schémas parallèles dans un même message.** Ne pas mélanger « Découverte 1 / question 1 / point A » : une seule séquence couvre l'ensemble des sujets numérotés. Les alternatives lettrées (A/B/C) sont locales à une question donnée et ne comptent pas comme une séquence parallèle.
+- **Si je constate avoir dérogé à ces règles dans un tour précédent**, je m'aligne immédiatement sur la convention imposée, sans signaler le changement.
 
 ### Auto-vérification avant envoi
 
