@@ -149,6 +149,14 @@ Règle de contrôle : si un mot français écrit sans accent **devrait** en port
 
 - Quand l'utilisateur rapporte un bug, un problème ou un comportement inattendu : **expliquer** le diagnostic, **proposer** une ou plusieurs solutions, **demander** l'aval **AVANT** de modifier le code source. Ne jamais passer directement à l'édition du code en phase diagnostique.
 
+# Manipulation du contenu de fichiers par script
+
+Pour tout script qui lit, écrit ou transforme le contenu textuel d'un fichier (création, réécriture, substitution, concaténation, parsing), **toujours utiliser bash**, jamais PowerShell.
+
+Raison : PowerShell 5.1 produit de l'UTF-16 LE BOM par défaut sur `Set-Content`/`Out-File`/`>` et gère mal les fins de ligne CR/LF, ce qui corrompt silencieusement les fichiers destinés à être lus par d'autres outils (git, éditeurs, compilateurs, parseurs).
+
+Les opérations purement filesystem (déplacement, suppression, renommage, listage) restent autorisées en PowerShell : elles ne touchent pas au contenu.
+
 # Git
 
 - Ne **JAMAIS** ajouter de ligne "Co-Authored-By" dans les messages de commit.
