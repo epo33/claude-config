@@ -1,6 +1,6 @@
 ---
 description: Tracer une violation de consigne (code ou message). Capture le contexte et écrit une entrée dans le journal mensuel.
-arguments: optionnel — référence fichier:lignes (ex. `src/foo.dart:42-58`), bloc collé, ou phrase libre. Sans argument, capture les deux derniers messages assistant.
+argument-hint: "optionnel : référence fichier:lignes type src/foo.dart:42-58, bloc collé, ou phrase libre. Sans argument, capture les deux derniers messages assistant."
 ---
 
 Enregistrer une **violation** de consigne dans `~/claude-config/violations/violations-YYYY-MM.jsonl`.
