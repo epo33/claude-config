@@ -24,11 +24,6 @@ Sur conflit entre consignes : signaler, proposer des alternatives, attendre.
 ## Diagnostic avant édition
 Bug, problème ou comportement inattendu rapporté : expliquer le diagnostic, proposer des solutions, attendre l'aval. Jamais d'édition de code en phase diagnostique.
 
-## Code muet
-Par défaut, aucun commentaire. Le nom des identifiants, la signature et la structure suffisent. Un commentaire est acceptable uniquement pour : contrainte cachée, invariant non évident, contournement de bug précis, référence externe (RFC, algorithme nommé), comportement qui surprendrait un lecteur. Si le code semble nécessiter un commentaire pour être clair → refactor, pas commentaire.
-
-Docstrings : expliquent **comment utiliser**, jamais comment c'est implémenté. Si l'usage est évident à partir du nom et de la signature, pas de docstring.
-
 ## Diff chirurgical
 Toucher uniquement ce que la tâche demande. Pas de refactoring « au passage », pas d'abstraction spéculative, pas de feature flag pour un besoin futur, pas de gestion d'erreur pour des cas qui ne peuvent pas se produire.
 
@@ -52,13 +47,6 @@ Pour toute tâche d'édition ou implémentation, formuler avant de commencer ce 
 Avant la première réponse d'un tour, afficher la version du modèle utilisée.
 
 # Au moment du geste
-
-## Avant chaque Write/Edit qui touche du code
-1. Aucun commentaire ajouté qui ne tombe pas dans les cas autorisés (cf. Code muet).
-2. Aucune ligne vide dans le corps des méthodes.
-3. Guillemets doubles pour les chaînes (langages où c'est autorisé). Exception : chaîne contenant des `"` mais aucun `'` → guillemets simples (sinon on remplace un échappement par un autre).
-4. Texte français porte ses accents (cf. Environnement).
-5. Aucune modification hors du périmètre demandé (cf. Diff chirurgical).
 
 ## Avant d'envoyer une réponse longue
 1. Longueur proportionnée à la question ? Sinon, couper.
@@ -88,14 +76,11 @@ Tout texte français porte ses accents, **sans exception**, y compris dans le co
 
 Pour la rédaction de documents, rapports, courriels : appliquer `~/.claude/skills/redaction-epo/prompt.md`.
 
-## Code — conventions générales (tous langages)
+## Code — conventions
+- Convention de nommage habituelle du langage utilisé.
 - Formateur officiel du langage (`dart format`, `prettier`, `ruff format`, `gofmt`).
-- Accolades et blocs explicites dans les structures de contrôle.
-- Guillemets doubles (`"`) pour les chaînes dans les langages qui l'autorisent.
-- Pas de typage explicite quand le type est évident par inférence. Typage explicite aux frontières publiques.
-- Classe privée : ses membres ne sont pas redéclarés privés.
-- Paramètres de callback inutilisés : `_` ou équivalent.
-- Vérifications positives plutôt que doubles négations (`value == null ? A : B` plutôt que `value != null ? B : A`).
+
+Les règles d'écriture détaillées (commentaires, docstrings, mise en forme, typage, ordonnancement, etc.) sont portées par le skill `relecture-code`. Je le lance moi-même via `/relecture-code` quand je le décide, en général en fin de tâche d'édition avant un commit. Tu ne le déclenches pas.
 
 ## Manipulation de contenu de fichiers par script
 Toujours bash, jamais PowerShell. PowerShell 5.1 produit de l'UTF-16 LE BOM par défaut sur `Set-Content`/`Out-File`/`>` et corrompt silencieusement les fichiers. Les opérations purement filesystem (déplacer, supprimer, lister) restent autorisées en PowerShell.
@@ -119,12 +104,10 @@ Repères pour Opus 4.7 (1M tokens) :
 Tu n'as pas de mesure fiable de l'utilisation du contexte. Ne pas inventer de pourcentage, ne pas prétendre surveiller un seuil que tu ne peux pas voir.
 
 ## Dart
-Avant toute production ou analyse de code Dart : lire `~/.claude/dart.instructions.md`.
-
 MCP Dart **interdit**. Utiliser les CLI : `dart fix --apply`, `dart format`, `dart analyze`, `dart test`.
 
 ## Synchronisation de la configuration
-La configuration vit dans `~/claude-config/`. Toute modification (CLAUDE.md, dart.instructions.md, settings.json, mcp.json, skills, commands) se fait dans `~/claude-config/config/`, **jamais** directement dans `~/.claude/`.
+La configuration vit dans `~/claude-config/`. Toute modification (CLAUDE.md, settings.json, mcp.json, skills, commands) se fait dans `~/claude-config/config/`, **jamais** directement dans `~/.claude/`.
 
 Au début de chaque session : `bash ~/claude-config/status.sh`, proposer `/claude-sync` si nécessaire. Après modification : `/claude-sync`.
 

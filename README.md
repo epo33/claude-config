@@ -19,7 +19,6 @@ Travailler avec Claude Code sur plusieurs postes (Windows, macOS, etc.) en conse
 claude-config/
 ├── config/                 # Source de vérité de la configuration
 │   ├── CLAUDE.md           # Instructions globales Claude
-│   ├── dart.instructions.md
 │   ├── settings.json
 │   ├── mcp.json
 │   ├── statusline-command.sh

@@ -1,7 +1,7 @@
 ---
 name: audit-version
-description: "Audit manuel des règles CLAUDE.md à l'occasion d'un changement de version de modèle. Lit le journal des violations/respects, croise avec CLAUDE.md et CLAUDE-rationale.md, produit un rapport markdown que l'utilisateur exploite ensuite pour décider des ajustements. INVOCATION MANUELLE UNIQUEMENT par /audit-version, jamais auto-déclenchée."
-user-invocable: true
+description: "Audit manuel des règles CLAUDE.md à l'occasion d'un changement de version de modèle. Lit le journal des violations/respects, croise avec CLAUDE.md et CLAUDE-rationale.md, produit un rapport markdown que l'utilisateur exploite ensuite pour décider des ajustements."
+disable-model-invocation: true
 ---
 
 Audit des règles comportementales sur la base des données empiriques accumulées dans le journal `~/claude-config/violations/violations-YYYY-MM.jsonl`.
@@ -14,8 +14,6 @@ L'utilisateur lance `/audit-version` typiquement :
 
 - au début d'une session sur une nouvelle version du modèle, pour vérifier si les règles tiennent encore,
 - périodiquement (hebdo, mensuel) pour observer les tendances et identifier les règles qui dérivent.
-
-Ne jamais s'auto-déclencher.
 
 ## Entrées
 
