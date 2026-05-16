@@ -6,6 +6,32 @@ disable-model-invocation: true
 
 Relecture des fichiers source modifiés depuis la dernière exécution du skill. Détecte et corrige en place les violations des règles d'écriture portées par ce skill.
 
+## Délégation
+
+**Règle** : déléguer systématiquement l'exécution à un sous-agent `general-purpose`. Pas d'exception, pas de mode inline. Quand l'utilisateur lance une relecture, c'est pour un volume qui justifie toujours la délégation, et le bénéfice en préservation de contexte est constant.
+
+### Consignes à transmettre au sous-agent
+
+Le prompt de délégation doit inclure ces instructions mot pour mot :
+
+> Tu exécutes le skill `relecture-code` en mode silencieux. Tu détermines la liste des fichiers, tu lis les règles, tu audites, tu appliques les corrections via Edit, tu mets à jour le marqueur `.claude/last-relecture`.
+>
+> Tu ne remontes au LLM principal **que** :
+>
+> 1. La ligne de bilan : `Relecture : N fichier(s) audité(s)[, V violation(s) architecturale(s) à traiter]`.
+> 2. Le bloc des violations architecturales s'il y en a (format dans la section « Sortie » du skill).
+>
+> Tu ne rapportes **pas** : la liste des fichiers lus, les règles consultées ou recopiées, les corrections appliquées fichier par fichier, les diffs, les explications de tes choix, un résumé de ce que tu as fait, un « voici ce qui a été corrigé ». Le LLM principal lit le diff git s'il veut connaître les changements.
+>
+> Aucun préambule, aucun épilogue, aucune phrase de transition. La sortie tient en quelques lignes maximum : bilan + éventuel bloc de violations, rien d'autre.
+
+### Côté LLM principal
+
+- Ne **pas** lire les fichiers audités.
+- Ne **pas** relire ni paraphraser les règles du skill.
+- Ne **pas** enrichir la sortie du sous-agent. La relayer telle quelle.
+
+
 ## Entrées
 
 1. Argument optionnel : liste de fichiers à auditer (chemins absolus ou relatifs au workspace courant), un par ligne.
@@ -134,6 +160,8 @@ Si l'extension du fichier ne figure pas dans la table, n'appliquer que les règl
 
 ## Étapes
 
+Les étapes ci-dessous sont exécutées **par le sous-agent**, jamais par le LLM principal (cf. « Délégation »).
+
 1. Déterminer la liste des fichiers à auditer.
 2. Filtrer par extension et exclusions.
 3. Si la liste est vide après filtrage : afficher « Aucun fichier source à relire. », mettre à jour le marqueur, sortir.
@@ -183,3 +211,5 @@ Le LLM principal lit ce bloc et décide d'agir ou non (validation de l'utilisate
 
 - Le marqueur `<workspace>/.claude/last-relecture` est à jour.
 - Les fichiers audités contiennent les corrections appliquées.
+
+
