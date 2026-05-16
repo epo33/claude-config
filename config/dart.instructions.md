@@ -57,6 +57,17 @@ int calculateSum( int a, int b) => return a+b; // Correct
  AnimatedBuilder( builder:(context, child) { ... } );
 ```
 
+# Bornes génériques
+
+Pour `class C<T extends B>` : ne pas répéter `B` à l'usage. Écrire `C` plutôt que `C<B>`.
+
+Multi-paramètres : omettre le paramètre est impossible si un autre paramètre doit être précisé. Dans ce cas, écrire le bound explicitement pour les paramètres concernés.
+
+Exemples :
+- `class Field<T extends Object>` → `Field`, jamais `Field<Object>`.
+- `class Pair<K extends Object, V extends Object>`, usage avec K=String, V=int → `Pair<String, int>`.
+- `class Map<K extends Object, V>`, usage avec K=Object, V=String → `Map<Object, String>` (K ne peut pas être omis seul).
+
 # Records Dart
 
 Les records Dart ne doivent comprendre que des champs nommés.
