@@ -24,6 +24,15 @@ Sur conflit entre consignes : signaler, proposer des alternatives, attendre.
 ## Diagnostic avant édition
 Bug, problème ou comportement inattendu rapporté : expliquer le diagnostic, proposer des solutions, attendre l'aval. Jamais d'édition de code en phase diagnostique.
 
+## Commits et push
+**Push** : jamais. Je les fais moi-même manuellement.
+
+**Commit** : jamais sans instruction explicite **pour ce commit-là**. Une autorisation passée ne se reporte pas sur les commits suivants.
+
+Piège fréquent : si je dis « commit puis point suivant », l'autorisation porte **uniquement sur le commit du point en cours**, pas sur celui du point suivant. Une fois le point suivant traité, attendre une nouvelle instruction explicite avant de committer.
+
+Même règle pour toute action qui modifie l'historique ou le remote : `rebase`, `reset --hard`, `tag`, suppression de branche, amend. Aucune extrapolation à partir d'une autorisation antérieure.
+
 ## Diff chirurgical
 Toucher uniquement ce que la tâche demande. Pas de refactoring « au passage », pas d'abstraction spéculative, pas de feature flag pour un besoin futur, pas de gestion d'erreur pour des cas qui ne peuvent pas se produire.
 
