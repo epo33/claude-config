@@ -31,6 +31,7 @@ Le prompt de délégation doit inclure ces instructions mot pour mot :
 - Ne **pas** relire ni paraphraser les règles du skill.
 - Ne **pas** enrichir la sortie du sous-agent. La relayer telle quelle.
 
+
 ## Entrées
 
 1. Argument optionnel : liste de fichiers à auditer (chemins absolus ou relatifs au workspace courant), un par ligne.
@@ -113,25 +114,18 @@ Tout texte en français (commentaires, docstrings, chaînes de log, messages d'e
 
 Privilégier la vérification positive. `value != null ? B : A` → `value == null ? A : B`. Formes équivalentes (`!isEmpty`, `!isAbsent`…) à inverser quand le résultat est plus lisible.
 
-### Accolades et blocs
+### Accolades et blocs explicites
 
 Toute structure de contrôle (`if`, `else`, `for`, `while`, `do`) doit utiliser des accolades, même pour une seule instruction. Pas de forme inline sans bloc.
 
 ```dart
 // Incorrect
-while (x > 0) doSomething();
+if (x > 0) doSomething();
 
 // Correct
-while (x > 0) {
+if (x > 0) {
   doSomething();
 }
-```
-
-**Exception** : un `if` sans `else` suivi d'une instruction courte doit être sur une seule ligne, sans accolade.
-
-```dart
-// Correct
-if (isEmpty) return 0;
 ```
 
 ### Paramètres de callback inutilisés
@@ -217,3 +211,5 @@ Le LLM principal lit ce bloc et décide d'agir ou non (validation de l'utilisate
 
 - Le marqueur `<workspace>/.claude/last-relecture` est à jour.
 - Les fichiers audités contiennent les corrections appliquées.
+
+
