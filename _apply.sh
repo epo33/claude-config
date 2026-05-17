@@ -11,6 +11,7 @@ CONFIG_DIR="$REPO_DIR/config"
 # Fichiers individuels à synchroniser
 FILES=(
   "CLAUDE.md"
+  "dart.instructions.md"
   "settings.json"
   "mcp.json"
   "statusline-command.sh"
