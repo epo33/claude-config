@@ -42,6 +42,7 @@ Sing follows a **model-first approach**:
 - [Database Queries and Security](./skills/QUERIES.md)
 - [Auto-JSON Serialization](./skills/AUTO_JSON.md)
 - [Generated code principles - How to find entity fields, search params or namespaces](./skills/GENERATED_CODE.md)
+- [Submodels: pathInfo architecture, hierarchy divergence, fix DataRegistry](./skills/SUBMODELS.md)
 
 ## 3. Example Project
 
