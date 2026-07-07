@@ -109,3 +109,85 @@ If `.resolve()` does not work on sub-model entities:
 2. Check `dataRegistry.pathInfo?.name` (app root)
 3. If the first segment of `fullName` ≠ root, the hierarchy divergence bug is the cause
 4. Ensure the `sing_core` version includes the `_subModelRoots` fix
+
+## 7. Inherited entities missing from `allEntities()` (sing_builder fix)
+
+### Symptom
+
+When a child model overrides a sub-model namespace (e.g. `PatientActivitiesNmclsNameSpace extends NmclsNameSpace`), the generated `ChildNmcls.entities` getter only lists the entities declared in the child class. The parent namespace's entities (e.g. `AppMessagesContext`, `AppMessagesLocale`, `PrintingSourceType` from socle's `NmclsNameSpace`) are absent.
+
+`allEntities()` / `entitiesOf<Nmcl>()` therefore misses them — the migration finds only N entities instead of N+M.
+
+### Root cause
+
+In `ObjectGenerator.canGenerate`:
+
+```dart
+bool canGenerate(GenerateFor generateFor) =>
+    subModel == null && super.canGenerate(generateFor);
+```
+
+Entities inherited from a sub-model have `subModel != null`, so `canGenerate` returns `false`. The `entities` getter is built from `subGenerators(builder)` which calls `g.canGenerate(builder.generateFor)` and therefore excludes these inherited entities.
+
+The namespace generators are handled correctly by `_inheritedSubNameSpaces` which deliberately calls `subGenerators()` **without** a builder argument (bypassing `canGenerate`) and then filters `g.subModel != null`. There was no equivalent for entity generators.
+
+### Fix in `sing_builder` (`name_space.dart`)
+
+Add `_inheritedEntities` (symmetric with `_inheritedSubNameSpaces`) and include it in the `entities` getter:
+
+```dart
+// In NameSpaceGenerator.getLibrary — entities getter body
+..body = CodeBuilder(
+  [
+    "[",
+    [
+      ..._inheritedEntities(builder),           // new: inherited from sub-model
+      ...subGenerators(builder)
+          .whereType<EntityGenerator>()
+          .where((e) => !e.propName.startsWith("_") && !e.isMixin),
+    ]
+        .map((e) => "dataRegistry.entities<${e.className}>(),")
+        .join(),
+    "]",
+  ],
+).code,
+
+// New method at the end of NameSpaceGenerator
+Iterable<EntityGenerator> _inheritedEntities(
+  ExpressionBuilderContext builder,
+) =>
+    subGenerators()                     // no builder → includes subModel generators
+        .whereType<EntityGenerator>()
+        .where((g) => g.subModel != null)
+        .where((g) => !g.propName.startsWith("_"))
+        .where((g) => !g.isMixin)
+        .where((g) => builder.generateForServer || !_onServerSide(g));
+```
+
+After the fix, `PatientsActivitiesNmcls.entities` produces the parent entities first, then the child's own entities:
+
+```dart
+Iterable<sing.EntityDef> get entities => [
+  dataRegistry.entities<AppMessagesContext>(),   // from NmclsNameSpace (socle)
+  dataRegistry.entities<AppMessagesLocale>(),
+  dataRegistry.entities<PrintingSourceType>(),
+  dataRegistry.entities<Bed>(),                  // from PatientsActivitiesNmclsNameSpace
+  // ... 9 more
+];
+```
+
+### Windows rename fallback (`generate_model.dart`)
+
+On Windows, the atomic directory rename used to save generated files can fail with `PathAccessException` when an IDE (e.g. VS Code Dart language server) holds files in `lib/src/sing` open. Added a recursive copy+delete fallback:
+
+```dart
+Future _renameDir(String oldPath, String newPath) async {
+  ...
+  try {
+    await d.rename(newPath);
+  } on PathAccessException {
+    await _copyDir(oldPath, newPath);
+    await _deleteDir(oldPath);
+  }
+}
+```
