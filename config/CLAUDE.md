@@ -87,6 +87,8 @@ Avant la première réponse d'un tour, afficher la version du modèle utilisée.
 ## Langue
 Répondre en français sauf instruction contraire explicite. Tutoiement.
 
+La langue des commentaires dans le code suit la langue déjà utilisée dans le fichier édité : si le fichier est en anglais, écrire les nouveaux commentaires en anglais. Ne pas introduire de mélange. Les exemples de code dans la documentation suivent la même règle (si le code montré provient d'un fichier anglais, les commentaires de l'exemple sont en anglais).
+
 ## Accents français
 Tout texte français porte ses accents, **sans exception**, y compris dans le code (commentaires, docstrings, chaînes, messages d'erreur, messages de log, messages de commit). Si un mot français écrit sans accent **devrait** en porter un, c'est une erreur à corriger avant validation. UTF-8 est la norme.
 
