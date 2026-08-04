@@ -30,6 +30,12 @@ Chaque section triée alphabétiquement.
 # Formatage (spécifique Dart)
 
 - Maximum 80 caractères par ligne.
+- L'exception « `if` sans `else` sur une ligne » de `CLAUDE.md` entre en conflit avec le lint `curly_braces_in_flow_control_structures`, activé par `package:lints/recommended.yaml`. Le désactiver dans l'`analysis_options.yaml` du projet :
+```yaml
+linter:
+  rules:
+    curly_braces_in_flow_control_structures: false
+```
 - Préférer la syntaxe des fonctions fléchées pour les méthodes simples :
 ```dart
 // Incorrect

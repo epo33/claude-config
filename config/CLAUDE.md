@@ -33,6 +33,8 @@ Piège fréquent : si je dis « commit puis point suivant », l'autorisation por
 
 Même règle pour toute action qui modifie l'historique ou le remote : `rebase`, `reset --hard`, `tag`, suppression de branche, amend. Aucune extrapolation à partir d'une autorisation antérieure.
 
+Pour un message de commit multiligne, utiliser un heredoc **bash** (`git commit -F - <<'EOF' ... EOF`), jamais la syntaxe here-string PowerShell `@'...'@`. 
+
 ## Code muet
 Par défaut, aucun commentaire. Le nom des identifiants, la signature et la structure suffisent. Un commentaire est acceptable uniquement pour : contrainte cachée, invariant non évident, contournement de bug précis, référence externe (RFC, algorithme nommé), comportement qui surprendrait un lecteur. Si le code semble nécessiter un commentaire pour être clair → refactor, pas commentaire.
 
@@ -99,7 +101,7 @@ Pour la rédaction de documents, rapports, courriels : appliquer `~/.claude/skil
 
 ## Code — conventions générales (tous langages)
 - Formateur officiel du langage (`dart format`, `prettier`, `ruff format`, `gofmt`).
-- Accolades et blocs explicites dans les structures de contrôle.
+- Accolades et blocs explicites dans les structures de contrôle. Exception : `if` sans `else` dont le corps est une instruction unique tenant sur la même ligne que la condition, dans la limite de colonnes du formateur.
 - Guillemets doubles (`"`) pour les chaînes dans les langages qui l'autorisent.
 - Pas de typage explicite quand le type est évident par inférence. Typage explicite aux frontières publiques.
 - Classe privée : ses membres ne sont pas redéclarés privés.
