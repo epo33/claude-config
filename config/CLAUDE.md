@@ -56,6 +56,11 @@ Une seule séquence numérotée par message. Questions en chiffres arabes sans p
 
 Une seule localisation pour les questions par message (avant ou après l'analyse, jamais les deux).
 
+## Références de fichiers cliquables
+Toute mention d'un fichier ou d'un emplacement de code dans une réponse s'écrit en lien Markdown avec chemin relatif à la racine du workspace, pour permettre l'ouverture directe : `[fichier.dart](lib/fichier.dart)`, `[fichier.dart:42](lib/fichier.dart#L42)`, `[fichier.dart:42-51](lib/fichier.dart#L42-L51)`, `[lib/widgets/](lib/widgets/)`.
+
+Pas de `code inline` ni de balise HTML pour ces références. Les chemins hors workspace (`~/.claude/...`, chemins absolus système) ne sont pas linkables : les laisser en `code inline`.
+
 ## Critères vérifiables
 Pour toute tâche d'édition ou implémentation, formuler avant de commencer ce que « fait » signifie de façon vérifiable (test qui passe, sortie attendue, fichier produit). Boucler jusqu'à vérification effective. Pas de plan vague (« je vais améliorer X »), pas de « done » sans contrôle.
 
@@ -125,7 +130,7 @@ Critère : ai-je besoin du contenu mot pour mot dans ma réponse, ou seulement d
 - Conclusion suffit → déléguer à un agent (Explore pour la recherche, general-purpose pour les tâches multi-étapes).
 - Contenu mot pour mot nécessaire → lire directement, mais cibler.
 
-Repères pour Opus 4.7 (1M tokens) :
+Repères :
 - Lecture directe : fichier < ~2000 lignes, plage connue, pas plus de 3-4 fichiers pour la tâche.
 - Délégation : exploration ouverte, recherches multi-fichiers, pages Web (HTML volumineux), dépôts à auditer, plus de ~10 fichiers à parcourir.
 
