@@ -36,9 +36,16 @@ Même règle pour toute action qui modifie l'historique ou le remote : `rebase`,
 Pour un message de commit multiligne, utiliser un heredoc **bash** (`git commit -F - <<'EOF' ... EOF`), jamais la syntaxe here-string PowerShell `@'...'@`. 
 
 ## Code muet
-Par défaut, aucun commentaire. Le nom des identifiants, la signature et la structure suffisent. Un commentaire est acceptable uniquement pour : contrainte cachée, invariant non évident, contournement de bug précis, référence externe (RFC, algorithme nommé), comportement qui surprendrait un lecteur. Si le code semble nécessiter un commentaire pour être clair → refactor, pas commentaire.
+Aucun commentaire, aucune docstring. Le nom des identifiants, la signature et la structure portent le sens. Décrire ce que fait le code, comment il le fait, ou découper un fichier en sections commentées, c'est créer une seconde source de vérité à maintenir : supprimer.
 
-Docstrings : expliquent **comment utiliser**, jamais comment c'est implémenté. Si l'usage est évident à partir du nom et de la signature, pas de docstring.
+Trois exceptions, et seulement si un lecteur compétent se tromperait sans elles :
+- choix non naturel qu'on serait tenté de « corriger » à tort ;
+- piège, invariant caché, contournement de bug précis d'une dépendance ;
+- référence externe qui ancre le code (RFC, spécification, algorithme nommé).
+
+Un commentaire dit alors **pourquoi**, jamais quoi ni comment. Si le code a besoin d'un commentaire pour être compris → refactor, pas commentaire.
+
+Directives fonctionnelles (`// ignore:`, pragmas, en-têtes de génération) et marqueurs `TODO` ne sont pas des commentaires au sens de cette règle : ils restent.
 
 ## Diff chirurgical
 Toucher uniquement ce que la tâche demande. Pas de refactoring « au passage », pas d'abstraction spéculative, pas de feature flag pour un besoin futur, pas de gestion d'erreur pour des cas qui ne peuvent pas se produire.

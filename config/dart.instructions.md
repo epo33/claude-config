@@ -93,7 +93,7 @@ final Status test = .active;
 
 # Documentation (exemple Dart)
 
-Application de la règle générale « pas de commentaire inutile, docComment seulement si l'usage n'est pas évident ». Contre-exemple à ne pas reproduire :
+Application de la règle générale « Code muet » : aucun docComment `///`, y compris sur l'API publique d'un package. Les lints `public_member_api_docs` et `package_api_docs` restent désactivés. Contre-exemple à ne pas reproduire :
 
 ```dart
 // Incorrect — tout ce qui suit est redondant avec les noms
