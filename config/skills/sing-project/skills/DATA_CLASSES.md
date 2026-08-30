@@ -108,7 +108,7 @@ final orders = $Orders.services(dataRegistry).search(status:Search.equal(OrderSt
 ```
 or in a server-side service:
 ```dart
-final orders = $Orders.query(callContext).load.where( where: (fields) => fields.status.$equal( OrderStatus.pending));
+final orders = $Order.query(callContext).load(where: (fields) => fields.status.$equal(OrderStatus.pending));
 ```
 the `orders` variable is of type `DataLoader<Order>`. `DataLoader` encapsulates the **promise** to obtain data but does not encapsulate **any data**. To obtain data and/or have any impact on the data, you must call one of the `DataLoader<E>` methods:
 - **listValues({int? limit})**: `Future<List<DataRowValues<E>>>`. Very often used.
@@ -121,13 +121,13 @@ the `orders` variable is of type `DataLoader<Order>`. `DataLoader` encapsulates 
 
 Examples (on server side):
 ```dart
-final pendingCount = await $Order.query(callContext).load
-  .where(where: (fields) => fields.status.$equal(OrderStatus.pending))
+final pendingCount = await $Order.query(callContext)
+  .load(where: (fields) => fields.status.$equal(OrderStatus.pending))
   .count();
 
 // Exécute sans récupérer de données
-await $Order.query(callContext).delete
-  .where(where: (fields) => fields.status.$equal(OrderStatus.cancelled))
+await $Order.query(callContext)
+  .delete(where: (fields) => fields.status.$equal(OrderStatus.cancelled))
   .execute();
 ```
 
@@ -147,7 +147,7 @@ final pendingOrders = await $Orders.services(dataRegistry).search(status:Search.
 
 #### Limiter les champs retournés
 ```dart
-final orders = await $Order.query(callContext).load
+final orders = await $Order.query(callContext).load()
   .fields((fields) => [
     fields.orderNumber,
     fields.totalAmount,
@@ -160,7 +160,7 @@ final orders = await $Order.query(callContext).load
 
 #### Eager loading de références
 ```dart
-final orders = await $Order.query(callContext).load
+final orders = await $Order.query(callContext).load()
   .resolve((fields) => [
     fields.customer,        // Charge la référence customer
     fields.customer.address // Charge aussi l'adresse du customer
@@ -199,8 +199,7 @@ for (final order in orders) {
 ```dart
 final orders = $Order
                    .query(callContext)
-                   .load
-                   .where( where: (fields) => fields.status.$equal( OrderStatus.pending))
+                   .load(where: (fields) => fields.status.$equal(OrderStatus.pending))
                    .fields( (fields) => [fields.orderNumber, fields.customer.name])
                    .resolve( (fields) => [fields.customer])
                    .sort( (fields) => [-fields.orderData])

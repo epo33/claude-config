@@ -41,7 +41,7 @@ The generic types of `EntityServerServices` must be defined with:
 - the type of the entity's primary key (or `Object` if the entity is not referenceable). To find this type, search for the private class associated with the entity (e.g., `class _Order$Impl extends sing.ServerEntityDef<Order, String>`). The second generic parameter of `sing.ServerEntityDef` is the type you are looking for.
 
 The `EntityServerServices` class defines 3 useful methods in the implementation of services:
-- `query` and `queryPk`: access to queries on the entity's table,
+- `$query`: the `Query<E, PK>` on the entity's table for the current call (see [QUERIES.md](QUERIES.md)),
 - `$applySearchOnlyFilters`: to override to define [extended filters](SEARCHES.md).
   
 ## 3. Adding a New Service

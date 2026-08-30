@@ -127,6 +127,7 @@ Lorsque tu ne respectes pas une consigne :
 
 - 26/11/25 : début du travail.
 - 26/11/25 : documentation complétée pour la définition des espaces de nom, des entités et des champs (fichier DATA_MODEL.md).
+- 30/08/26 : QUERIES.md, SERVICES.md, DATA_CLASSES.md réalignés sur le chantier moteur de requêtes : `Query<E, PK>` fusionnée (plus de `queryPk`), verbes de lecture et d'écriture plats (`load(where:)`, `insert(rows)`, `updateWhere(set:, where:)`, `delete(where:)`, `upsert(rows, on:)` sur `MergeRows`), nouvelle section sur le builder du moteur ouvert par `select()` (jointures, `groupBy`/`project`, CTE, compounds), `insertSelect`/`updateSelect`.
 
 ---
 
