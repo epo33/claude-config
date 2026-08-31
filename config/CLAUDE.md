@@ -31,6 +31,8 @@ Bug, problème ou comportement inattendu rapporté : expliquer le diagnostic, pr
 
 Piège fréquent : si je dis « commit puis point suivant », l'autorisation porte **uniquement sur le commit du point en cours**, pas sur celui du point suivant. Une fois le point suivant traité, attendre une nouvelle instruction explicite avant de committer.
 
+Avant chaque commit, vérifier que la branche courante (`git branch --show-current`) est bien celle qui doit porter les modifications en cours. Si la branche ne correspond pas au sujet des modifications, ou en cas de doute, ne pas committer : signaler l'incohérence, proposer la branche appropriée et attendre confirmation.
+
 Même règle pour toute action qui modifie l'historique ou le remote : `rebase`, `reset --hard`, `tag`, suppression de branche, amend. Aucune extrapolation à partir d'une autorisation antérieure.
 
 Pour un message de commit multiligne, utiliser un heredoc **bash** (`git commit -F - <<'EOF' ... EOF`), jamais la syntaxe here-string PowerShell `@'...'@`. 
