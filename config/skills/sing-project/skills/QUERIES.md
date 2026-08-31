@@ -545,6 +545,14 @@ final order = await $Order.query(callContext).insert([orderDataRow]).exactlyOne(
 print("Order created: ${order.uuid.value}");
 ```
 
+`insertNewRow` builds the row for you on fresh values and inserts it:
+```dart
+final order = await $Order.query(callContext).insertNewRow((values) {
+  values["reference"].value = "ORD-001";
+  values["customer"].value = customerRef;
+}).exactlyOne();
+```
+
 #### 3.2.2. Inserting Multiple Rows
 
 ```dart
