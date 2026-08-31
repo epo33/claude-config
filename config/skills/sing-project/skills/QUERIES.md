@@ -547,10 +547,14 @@ print("Order created: ${order.uuid.value}");
 
 `insertNewRow` builds the row for you on fresh values and inserts it:
 ```dart
-final order = await $Order.query(callContext).insertNewRow((values) {
-  values.reference.value = "ORD-001";
-  values.customer.primaryKey = customer.uuid.value;
-}).exactlyOne();
+final order = await $Order
+    .query(callContext)
+    .insertNewRow(
+      (values) => values
+        ..reference.value = "ORD-001"
+        ..customer.primaryKey = customer.uuid.value,
+    )
+    .exactlyOne();
 ```
 
 #### 3.2.2. Inserting Multiple Rows
