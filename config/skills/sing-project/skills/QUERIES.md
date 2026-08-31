@@ -642,10 +642,10 @@ await $Order.query(callContext).update(
 
 #### 3.3.2. Bulk Update with WHERE
 
-`updateWhere` sets columns on every row a predicate selects, without loading them. The `set` callback receives a `FieldSetter` and the **fields** of the entity (`Field` objects, not expressions):
+`updateWhere` sets columns on every row a predicate selects, without loading them. The `set` callback receives the **fields** of the entity and a `FieldSetter` (`Field` objects, not expressions):
 ```dart
 await $Order.query(callContext).updateWhere(
-  set: (set, fields) => set.setValue(fields.status, OrderStatus.cancelled),
+  set: (fields, set) => set.setValue(fields.status, OrderStatus.cancelled),
   where: (fields) =>
       fields.status.$equal(OrderStatus.pending) &
       fields.orderDate.$daysFrom(UtcDateTime.now()).$greaterThan(30),
@@ -660,7 +660,7 @@ await $Order.query(callContext).updateWhere(
 **Update counter with subquery:**
 ```dart
 await $Order.query(callContext).updateWhere(
-  set: (set, fields) => set.setExpr(
+  set: (fields, set) => set.setExpr(
     fields.lineCount,
     (order) => $OrderLine.query(callContext).oneValue(
       what: (line) => line.uuid.$count(),
@@ -674,7 +674,7 @@ await $Order.query(callContext).updateWhere(
 **Calculation from other fields:**
 ```dart
 await $OrderLine.query(callContext).updateWhere(
-  set: (set, fields) => set.setExpr(
+  set: (fields, set) => set.setExpr(
     fields.lineTotal,
     (line) => line.quantity.$asDouble * line.unitPrice,
   ),
@@ -1252,7 +1252,7 @@ Joins are automatically built.
 **With setValue (when you have a Reference):**
 ```dart
 await $Order.query(callContext).updateWhere(
-  set: (set, fields) => set.setValue(fields.customer, newCustomerRef),
+  set: (fields, set) => set.setValue(fields.customer, newCustomerRef),
   where: (fields) => fields.uuid.$equal(orderId),
 ).execute();
 ```
@@ -1260,7 +1260,7 @@ await $Order.query(callContext).updateWhere(
 **With setExpr (subquery):**
 ```dart
 await $Order.query(callContext).updateWhere(
-  set: (set, fields) => set.setExpr(
+  set: (fields, set) => set.setExpr(
     fields.assignedTo,
     (_) => $User.query(callContext).oneValue(
       what: (user) => user.uuid,
