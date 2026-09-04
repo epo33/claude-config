@@ -143,7 +143,7 @@ final bigOrders = await $Order
                       line.order.status.$equal(OrderStatus.delivered),
                 )
                 .$avg() *
-            1.5.toExpresssion(),
+            1.5.toExpression(),
       ),
     )
     .listValues();
@@ -248,9 +248,9 @@ fields.title.$capitalize         // Capitalize first letter
 fields.name.$length              // Length (returns ValueExpr<num>)
 
 // Substrings
-fields.code.$subString(1.toExpresssion(), 3.toExpresssion())   // First 3 characters
-fields.code.$leftChars(5.toExpresssion())                      // First 5
-fields.code.$rightChars(3.toExpresssion())                     // Last 3
+fields.code.$subString(1.toExpression(), 3.toExpression())   // First 3 characters
+fields.code.$leftChars(5.toExpression())                      // First 5
+fields.code.$rightChars(3.toExpression())                     // Last 3
 
 // Concatenation
 fields.firstName.$concat(" ").$concatExpr(fields.lastName)
@@ -272,16 +272,16 @@ fields.quantity * fields.unitPrice          // Multiplication
 fields.total / fields.quantity              // Division (returns double)
 fields.amount.$negate()                     // Unary minus
 fields.total.$intDivide(fields.count)       // Integer division
-fields.value.$power(2.toExpresssion())      // Power
+fields.value.$power(2.toExpression())      // Power
 fields.delta.$abs                           // Absolute value
 ```
 
 **Rounding:**
 ```dart
 fields.price.$round()                        // Round to integer
-fields.price.$roundTo(2.toExpresssion())     // Round to 2 decimals
+fields.price.$roundTo(2.toExpression())     // Round to 2 decimals
 fields.price.$trunc()                        // Truncate to integer
-fields.price.$truncTo(2.toExpresssion())     // Truncate to 2 decimals
+fields.price.$truncTo(2.toExpression())     // Truncate to 2 decimals
 fields.price.$asInt             // Conversion to int
 fields.count.$asDouble          // Conversion to double
 ```
@@ -387,7 +387,7 @@ fields.deleted.$equal(false)
 
 Convert a bool value to expression:
 ```dart
-true.toExpresssion()
+true.toExpression()
 ```
 
 ### 2.4. Predicates and Logical Operators
@@ -465,14 +465,14 @@ where: (fields) =>
 
 ### 2.5. Converting Values to Expressions
 
-To use a Dart value in an expression calculation, convert it with `.toExpresssion()`:
+To use a Dart value in an expression calculation, convert it with `.toExpression()`:
 
 ```dart
 // Available for: String, int, double, bool
 final maxDiameter = 25.5; // Dart double
 
 where: (dim) =>
-  (maxDiameter.toExpresssion() - dim.value * dim.unit.$map(toMmFactor))
+  (maxDiameter.toExpression() - dim.value * dim.unit.$map(toMmFactor))
     .$lessThan(0.0)
 ```
 
@@ -1178,16 +1178,16 @@ final written = await merge.execute(callContext);
 final maxExternalDiameter = 25.5; // Dart value
 
 where: (dim) =>
-  (maxExternalDiameter.toExpresssion() -
+  (maxExternalDiameter.toExpression() -
     dim.value * dim.unit.$map(dimensionToMm).$cast<double>())
       .$lessThan(-epsilon)
 ```
 
-**Why `toExpresssion()`?**
+**Why `toExpression()`?**
 - `maxExternalDiameter` is a Dart `double`
 - Fields (`dim.value`) are `ValueExpr<double>`
 - Arithmetic operators require `ValueExpr op ValueExpr`
-- `.toExpresssion()` converts the Dart value to an expression
+- `.toExpression()` converts the Dart value to an expression
 
 #### 6.1.2. Type Casting for Arithmetic
 
@@ -1208,7 +1208,7 @@ where: (dim) =>
 static const epsilon = 1E-8;
 
 where: (dim) =>
-  (edMax.toExpresssion() -
+  (edMax.toExpression() -
     dim.value * dim.unit.$map(dimToMM).$cast<double>())
       .$lessThan(-epsilon)
 ```
@@ -1227,12 +1227,12 @@ List<List> orders = await $Order
         fields.orderNumber,
         Expression.$Iif<String>({
           fields.status.$equal(OrderStatus.pending): 'Pending'
-              .toExpresssion(),
+              .toExpression(),
           fields.status.$equal(OrderStatus.processing): 'Processing'
-              .toExpresssion(),
+              .toExpression(),
           fields.status.$equal(OrderStatus.shipped): 'Shipped'
-              .toExpresssion(),
-        }, otherwise: 'Other'.toExpresssion()),
+              .toExpression(),
+        }, otherwise: 'Other'.toExpression()),
       ],
     );
 ```
@@ -1265,9 +1265,9 @@ where: (fields) =>
 
 ```dart
 final adjustedPrice = fields.priceCategory.$mapExpr({
-  PriceCategory.retail: fields.basePrice * 1.2.toExpresssion(),
-  PriceCategory.wholesale: fields.basePrice * 0.9.toExpresssion(),
-  PriceCategory.vip: fields.basePrice * 0.8.toExpresssion(),
+  PriceCategory.retail: fields.basePrice * 1.2.toExpression(),
+  PriceCategory.wholesale: fields.basePrice * 0.9.toExpression(),
+  PriceCategory.vip: fields.basePrice * 0.8.toExpression(),
 }, defaultValue: fields.basePrice);
 ```
 
@@ -1521,7 +1521,7 @@ $Entity.query(callContext).select() // Engine builder: TupleSelect<E>
 
 - **`$`**: Identifies framework methods/fields (avoids conflicts)
 - **`Expr`**: Suffix for variants taking expressions (`$equalExpr`)
-- **`toExpresssion()`**: Converts a Dart value to expression
+- **`toExpression()`**: Converts a Dart value to expression
 - **`$cast<T>()`**: Forces expression type
 - **`.getValue()`**: Executes a scalar subquery and returns the value
 - **`$asc` / `$desc`**: Turn an expression into a `SortSpec` (`orderBy`)
@@ -1546,5 +1546,4 @@ $Entity.query(callContext).select() // Engine builder: TupleSelect<E>
 **To go further:**
 - [DATA_CLASSES.md](DATA_CLASSES.md) - DataRowValues, DataLoader, DataRow
 - [SERVICES.md](SERVICES.md) - Define and implement services
-- [ACCESS_TOKEN.md](ACCESS_TOKEN.md) - Data access control
 - [CONCEPTS_RELATIONSHIPS.md](CONCEPTS_RELATIONSHIPS.md) - Entity relationships

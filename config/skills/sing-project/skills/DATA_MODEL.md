@@ -140,7 +140,6 @@ class OrderEntity extends ModelEntity {
 }
 ```
 
-[Details on access control](ACCESS_TOKEN.md)
 
 ### 3.5. @DbName(...)
 Allows you to specify the entity's storage table name

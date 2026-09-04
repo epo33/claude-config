@@ -26,7 +26,6 @@ Sing follows a **model-first approach**:
 - [Project Structure & Naming Conventions](PROJECT_STRUCTURE.md)
 - [Model entities, namespaces, fields, CRUD services, search services](DATA_MODEL.md)
 - [Defining services on entities or namespaces](SERVICES.md)
-- [Control accesses to services or entity data](ACCESS_TOKEN.md)
 - [How to prepare database schema migration](MIGRATIONS.md)
 - [How to use Sing in server applications](APP_SERVER.md)
 - [How to use Sing in client applications](APP_CLIENT.md)
