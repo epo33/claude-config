@@ -10,10 +10,12 @@ SearchOnField<T> (classe abstraite)
 ├── SearchOnNumeric<T> (classe abstraite)
 │   ├── SearchOnInt
 │   └── SearchOnFloat
-└── SearchOnDateTime<T> (classe sealed)
-    ├── SearchOnLocalDateTime
-    ├── SearchOnUtcDateTime
-    └── SearchOnDateOnly
+├── SearchOnDuration extends SearchOnField<Duration>
+├── SearchOnDateTime<T> (classe sealed)
+│   ├── SearchOnLocalDateTime
+│   ├── SearchOnUtcDateTime
+│   └── SearchOnDateOnly
+└── CompoundSearchOnField<T>
 ```
 Le type générique est celui du champ de l'entité.
 
@@ -139,21 +141,22 @@ Search.equal('premium') | Search.equal('vip')
 Utilisés avec les opérations de recherche des entités pour filtrer les données.
 
 ```dart
-// Recherche de produits
-final results = await db.products.search(
-  stockQuantity: SearchOnInt(value: 50, type: SearchOnNumericType.greaterThan)
-  & SearchOnString(text: 'active', type: .equal)
-);
+// Recherche de produits, côté serveur
+final results = await $Product.services(callContext).search(
+  callContext: callContext,
+  stockQuantity: SearchOnInt(value: 50, type: .greaterThan),
+  sku: SearchOnString(text: "FG-", type: .prefix) | SearchOnString(text: "FH-", type: .prefix),
+).listValues();
 ```
 
 ## Comportement
 
-- **`acceptValue(value)`** : Valide une valeur côté client (sans base de données), retourne `true` ou `false`.
-- **`applyFilters(expression)`** : Génère un prédicat SQL pour la base, retourne `null` si le critère est vide.
+- **`applyFilters(fieldExpr)`** (extension de `sing_server`) : génère le prédicat SQL du critère sur l'expression du champ, retourne `null` si le critère est vide. Sur un champ de référence, le critère porte sur la clé stockée (`$keyValue`).
+- **`toJson()`** : forme de transport du critère, objet JSON portant une clé `$kind` qui nomme sa classe (`string`, `int`, `float`, `duration`, `localDate`, `utcDate`, `dateOnly`, `all`, `one`, `none`, ...). `SearchOnField.fromJson<T>(json)` reconstruit le critère à partir de cette clé.
 
 ## Notes importantes
 
-- **Valeurs null** : Par défaut rejetées (sauf `SearchNull`).
+- **Valeurs null** : sémantique SQL, un critère d'égalité ne retient jamais une valeur `NULL` ; utiliser `SearchNull` (`Search.isNull()`, `Search.isNotNull()`).
 - **Critères vides** : N'appliquent pas de filtre (`isEmpty == true`), acceptent toutes les valeurs.
 - **Chaînes vides** : Considérées comme vides dans `SearchOnString`.
 - **Option `round`** : Arrondit les nombres pour éviter les problèmes de précision.

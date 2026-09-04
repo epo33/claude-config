@@ -2,192 +2,122 @@
 
 ## 1. Concept
 
-A sub-model is an existing `DataRegistry` (e.g. `Socle`) reused inside a host application (e.g. `Builder`). The generated class `Builder$Registry` extends `Socle$RegistryBase` and merges both models.
+A sub-model is a Sing model package (e.g. `coverage/coverage_base`, model `CoverageBase`) mounted inside a host model (e.g. `coverage/coverage_model`, model `Coverage`). The host application then exposes the entities, services, enums and tuples of both models through a single registry.
 
-## 2. PathInfo architecture in a multi-sub-model app
-
-### 2.1. What is generated
-
-`Builder$Registry` builds its `pathInfo` tree by **flattening** the sub-model items directly under the app root:
+### 1.1. Declaration in the host model
 
 ```dart
-// In builder_sing_client/lib/src/client.dart (generated)
-@override
-sing.PathInfo get pathInfo => _pathInfo ??= sing.PathInfo(
-  Builder.pathInfos.name,        // "builder" — app root
-  ...
-  items: Builder.pathInfos.items.followedBy(
-    _p3.Socle$RegistryBase.subModelPathInfoItems,  // Socle items, flattened
-    // → Security, System, etc. are direct children of "builder"
-    // → The "socle" node does NOT exist in the pathInfo tree
-  ),
+// coverage/coverage_base/lib/model/model.dart
+Model createCoverageBaseModel() => Model(
+  modelName: "CoverageBase",
+  packageName: "coverage_base",
+  isSubModel: true,
+  rootNameSpace: CoverageBaseNameSpace(),
+  commonPackagePath: "../coverage_base_common",
+  // ...
 );
+
+// coverage/coverage_model/lib/model/model.dart
+Model createCoverageModel() => Model(
+  modelName: "Coverage",
+  subModels: [createCoverageBaseModel()],
+  rootNameSpace: CoverageNameSpace(),
+  commonPackagePath: "../coverage_common",
+  // ...
+);
+
+class CoverageNameSpace extends CoverageBaseNameSpace { ... }
 ```
 
-`subModelPathInfoItems = Socle.pathInfos.items` — the children of Socle, **not Socle itself**.
+- `Model.subModels` lists the mounted models.
+- The host root namespace **extends** the sub-model root namespace, so the host inherits the sub-model namespaces and entities.
+- The host model package depends on the sub-model model package (`coverage_model` on `coverage_base`) and the host common package depends on the sub-model model package too (`coverage_common` imports `package:coverage_base/model.dart`).
+- An entity of the host can reference an entity of the sub-model (`ReferenceTo<TopicEntity>()` in `coverage_model/lib/model/notes/tagged_note.dart`).
+- The sub-model's `lib/model.dart` exports its model definitions; its generated `server.dart` re-exports `../model/model.dart` (effect of `isSubModel: true`), so importing the host's `server.dart` gives access to the sub-model definitions.
+- Entity inheritance is limited to two levels (checked by `sing_builder`).
 
-The sub-model root node (`Socle`) is registered separately:
+### 1.2. Generated registries
+
+Each model `Xxx` yields:
+
+| Generated symbol | File | Role |
+|---|---|---|
+| `Xxx$Layer` (`const`) | `server.dart` (`ServerModelLayer`), client `client.dart` (`ModelLayer`) | What the model brings to a registry: `name`, `uuid`, `version`, `compiledAt`, `pathInfo`, `enumDefs`, `tupleDefs`, `jsonAdapters`, `registerTokens()`, plus `majorVersions` on the server |
+| `XxxRegistry<E extends EntityDef>` | common `src/sing/registry.dart` | Model interface, implementing `DataRegistry<E>` and the interfaces of the sub-models (`CoverageRegistry<E> implements sing.DataRegistry<E>, base.CoverageBaseRegistry<E>`) |
+| `XxxServerRegistry` | `server.dart` | `abstract interface class` implementing `ServerDataRegistry`, `XxxRegistry<ServerEntityDef>` and the server interfaces of the sub-models (`CoverageServerRegistry implements ..., CoverageBaseServerRegistry`). Carries the factory and `static const modelLayers` |
+| `XxxClientRegistry` | client `client.dart` | Same on the client side (`ClientDataRegistry`, `XxxRegistry<ClientEntityDef>`) |
+| `_Xxx$Registry` | `server.dart` / `client.dart` | Private implementation, `extends ServerDataRegistryBase` (or `ClientDataRegistryBase`), built with `layers: XxxServerRegistry.modelLayers` |
 
 ```dart
-registerSubModelRoot(_p3.Socle$RegistryBase.subModelPathInfo);
+// coverage/coverage_model/lib/sing/server.dart (generated)
+abstract interface class CoverageServerRegistry
+    implements
+        sing.ServerDataRegistry,
+        common.CoverageRegistry<sing.ServerEntityDef>,
+        _p1.CoverageBaseServerRegistry {
+  factory CoverageServerRegistry({
+    required sing.ServerDataControler dataControler,
+    sing.DebugPrinter? debugger,
+    bool debugMode,
+  }) = _Coverage$Registry;
+
+  static const modelLayers = <sing.ServerModelLayer>[
+    ..._p1.CoverageBaseServerRegistry.modelLayers,
+    Coverage$Layer(),
+  ];
+}
 ```
 
-### 2.2. The two hierarchies
+`modelLayers` spreads the `modelLayers` of the direct sub-models, then the model's own layer: the list goes from the lowest layer to the model's own. A `CoverageServerRegistry` is usable wherever a `CoverageBaseServerRegistry` is expected.
+
+## 2. Layer stacking in `DataRegistryBase`
+
+`DataRegistryBase(layers:)` (sing_core) receives the layers and:
+
+- keeps the first occurrence of a layer stacked twice (same `uuid`, e.g. two sub-models mounting the same base) and refuses two distinct layers with the same `name`;
+- takes identity (`uuid`, `version`, `compiledAt`) from the **last** layer (the model's own); `versionChain` joins the `version` of every layer with `-`; `layers` is the deduplicated list;
+- builds `pathInfo` from the last layer's `pathInfo`, with `items` = the model's own items **followed by** the items of every lower layer (**flattened** under the host root);
+- registers each lower layer's root `PathInfo` as a sub-model root (used by the path lookup fallbacks below, and so that `nameSpaces` can build the sub-model root namespace type);
+- merges `enumDefs`, registers the `jsonAdapters` and `tupleDefs` of all layers (a duplicated tuple key, or a tuple key equal to an entity path, throws a `StateError`), then calls `registerTokens()` on each layer.
+
+`ServerDataRegistryBase` also computes `modelVersions` (the `majorVersions` of all server layers, numbered as one chain) and `layerVersions` (each layer numbered independently), see [MIGRATIONS.md](MIGRATIONS.md).
+
+## 3. The two hierarchies
 
 | Hierarchy | Used by | Resulting path |
 |---|---|---|
-| Namespaces (`NameSpace.parent`) | `entity.fullName` | `/socle/security/sessions` |
-| PathInfo (`pathInfo.items`) | `DataRegistry.findObject(path)` | `builder/security/sessions` |
+| Namespaces (`NameSpace.parent`) | `entity.fullName` (i18n key of model documentation only) | `/coveragebase/topics/topics` |
+| PathInfo (`pathInfo.items`) | `DataRegistry.findObject(path)`, `tupleDefByKey`, `Xxx.tupleKey` | `coverage/topics/topics`, `topics/topics` |
 
-These two hierarchies **diverge** in sub-model apps: `entity.fullName` walks up to the namespace root (`Socle.parent = null`), producing `/socle/...`, while the pathInfo tree has `"builder"` as root with Socle's items flattened beneath it.
+`entity.fullName` walks up the namespace chain to the sub-model root (`CoverageBase.parent == null`), while the pathInfo tree has the host root with the sub-model items flattened beneath it. The sub-model root is **not** a node of the pathInfo tree.
 
-## 3. Impact on `Expect` and `.resolve()`
+### 3.1. Path resolution (`findPathInfos`)
 
-`Expect.toJson()` emits:
-```json
-{ "entityDef": "/socle/security/sessions", "resolutions": [...], ... }
-```
+`DataRegistryBase.findPathInfos(segments)` tries, in order:
 
-On the server, `Expect.fromJson()` calls:
-```dart
-dataRegistry.findObject<EntityDef>("/socle/security/sessions")
-// → pathSegments = ["socle", "security", "sessions"]
-// → "socle" ≠ root "builder" → BEFORE FIX: null → resolutions ignored
-```
+1. the direct search from the host root (`coverage/topics/topics`);
+2. each registered sub-model root (`coveragebase/topics/topics`, the `fullName` form);
+3. root-less paths (`topics/topics`, the `tupleKey` form): the first segment is matched against the children of the host root, then against the children of each sub-model root.
 
-**Symptom**: `.resolve((fields) => [fields.user, ...])` does not transmit resolutions to the server. `session.user.dataRowValues` crashes (User not loaded).
+Sub-models nested in sub-models are handled the same way: every lower layer of the flattened `layers` list registers its root on the same registry.
 
-## 4. Fix applied in `DataRegistry` (sing_core)
+### 3.2. Inherited entities in a namespace
 
-`registerSubModelRoot` now also populates `_subModelRoots` in addition to `_constructors`. `findPathInfos` first attempts the direct search from the main root, then falls back to each registered root:
+The generated namespace class of the host lists the inherited namespaces and entities: `Coverage.subNameSpaces` includes `dataRegistry.nameSpaces<Topics>()` although `Topics` is declared by `CoverageBase`, and a namespace overriding a sub-model namespace lists the parent entities before its own in its `entities` getter. Walking the namespaces of the registry (`visitModel`, `rootNameSpace`) therefore reaches the whole stack.
 
-```dart
-// data_registry.dart
-final _subModelRoots = <PathInfo>{};
+## 4. Client side
 
-void registerSubModelRoot(PathInfo subModelRoot) {
-  if (subModelRoot.nameSpaceBuilder != null) {
-    _constructors[subModelRoot.type] = subModelRoot.nameSpaceBuilder!;
-  }
-  _subModelRoots.add(subModelRoot);  // new
-}
+The client registry stacks the same way: `CoverageClientRegistry.modelLayers` spreads the sub-model client layers, and the generated access chains `Xxx$Ent` / `Xxx$Svc` type their `$dataRegistry` on `XxxClientRegistry`.
 
-@protected
-PathInfo? findPathInfos(Iterable<String> pathSegments) {
-  // ... searchIn() unchanged ...
-  final direct = searchIn(pathSegments, info);
-  if (direct != null) return direct;
-  // Fallback: try each registered submodel root
-  for (final subRoot in _subModelRoots) {
-    final result = searchIn(pathSegments.toList(growable: false), subRoot);
-    if (result != null) return result;
-  }
-  return null;
-}
-```
+## 5. Test bench
 
-### Automatic recursion
-
-If `Socle` itself embeds a sub-model `Plugin`, the `Socle$RegistryBase` constructor calls `registerSubModelRoot(Plugin.pathInfos)` on `this` (= the `Builder$Registry` instance). All sub-model levels end up in `_subModelRoots` of the app registry with no additional code.
-
-## 5. Unchanged behavior
-
-`findObject("builder/security/sessions")` — used in `$callService` via:
-```dart
-final rootName = $dataRegistry.pathInfo?.name;  // "builder"
-final onEntity = $dataRegistry.findObject<EntityDef>("$rootName$servicesPath");
-// → "builder/security/sessions" → direct hit in the flattened tree → OK
-```
-
-This path bypasses the fallback (found on first attempt) — no regression.
+`coverage/coverage_model/test/layer_stack_test.dart` exercises a sub-model mounted by the coverage model against a real database: registry construction through `CoverageServerRegistry(dataControler: PgDataControler(...))`, `migrateDatabase`, the three path forms of `findObject` (`topics/topics`, `coveragebase/topics/topics`, `coverage/topics/topics`), `tupleDefByKey(TopicCount.tupleKey)`, the sub-model namespaces and enum tables.
 
 ## 6. Quick diagnosis
 
-If `.resolve()` does not work on sub-model entities:
+If an entity or a service of a sub-model is not found:
 
-1. Check `entity.fullName` for the entity in question (e.g. `HttpSession`)
-2. Check `dataRegistry.pathInfo?.name` (app root)
-3. If the first segment of `fullName` ≠ root, the hierarchy divergence bug is the cause
-4. Ensure the `sing_core` version includes the `_subModelRoots` fix
-
-## 7. Inherited entities missing from `allEntities()` (sing_builder fix)
-
-### Symptom
-
-When a child model overrides a sub-model namespace (e.g. `PatientActivitiesNmclsNameSpace extends NmclsNameSpace`), the generated `ChildNmcls.entities` getter only lists the entities declared in the child class. The parent namespace's entities (e.g. `AppMessagesContext`, `AppMessagesLocale`, `PrintingSourceType` from socle's `NmclsNameSpace`) are absent.
-
-`allEntities()` / `entitiesOf<Nmcl>()` therefore misses them — the migration finds only N entities instead of N+M.
-
-### Root cause
-
-In `ObjectGenerator.canGenerate`:
-
-```dart
-bool canGenerate(GenerateFor generateFor) =>
-    subModel == null && super.canGenerate(generateFor);
-```
-
-Entities inherited from a sub-model have `subModel != null`, so `canGenerate` returns `false`. The `entities` getter is built from `subGenerators(builder)` which calls `g.canGenerate(builder.generateFor)` and therefore excludes these inherited entities.
-
-The namespace generators are handled correctly by `_inheritedSubNameSpaces` which deliberately calls `subGenerators()` **without** a builder argument (bypassing `canGenerate`) and then filters `g.subModel != null`. There was no equivalent for entity generators.
-
-### Fix in `sing_builder` (`name_space.dart`)
-
-Add `_inheritedEntities` (symmetric with `_inheritedSubNameSpaces`) and include it in the `entities` getter:
-
-```dart
-// In NameSpaceGenerator.getLibrary — entities getter body
-..body = CodeBuilder(
-  [
-    "[",
-    [
-      ..._inheritedEntities(builder),           // new: inherited from sub-model
-      ...subGenerators(builder)
-          .whereType<EntityGenerator>()
-          .where((e) => !e.propName.startsWith("_") && !e.isMixin),
-    ]
-        .map((e) => "dataRegistry.entities<${e.className}>(),")
-        .join(),
-    "]",
-  ],
-).code,
-
-// New method at the end of NameSpaceGenerator
-Iterable<EntityGenerator> _inheritedEntities(
-  ExpressionBuilderContext builder,
-) =>
-    subGenerators()                     // no builder → includes subModel generators
-        .whereType<EntityGenerator>()
-        .where((g) => g.subModel != null)
-        .where((g) => !g.propName.startsWith("_"))
-        .where((g) => !g.isMixin)
-        .where((g) => builder.generateForServer || !_onServerSide(g));
-```
-
-After the fix, `PatientsActivitiesNmcls.entities` produces the parent entities first, then the child's own entities:
-
-```dart
-Iterable<sing.EntityDef> get entities => [
-  dataRegistry.entities<AppMessagesContext>(),   // from NmclsNameSpace (socle)
-  dataRegistry.entities<AppMessagesLocale>(),
-  dataRegistry.entities<PrintingSourceType>(),
-  dataRegistry.entities<Bed>(),                  // from PatientsActivitiesNmclsNameSpace
-  // ... 9 more
-];
-```
-
-### Windows rename fallback (`generate_model.dart`)
-
-On Windows, the atomic directory rename used to save generated files can fail with `PathAccessException` when an IDE (e.g. VS Code Dart language server) holds files in `lib/src/sing` open. Added a recursive copy+delete fallback:
-
-```dart
-Future _renameDir(String oldPath, String newPath) async {
-  ...
-  try {
-    await d.rename(newPath);
-  } on PathAccessException {
-    await _copyDir(oldPath, newPath);
-    await _deleteDir(oldPath);
-  }
-}
-```
+1. Check that the sub-model layer is in `dataRegistry.layers` (and in `XxxServerRegistry.modelLayers`).
+2. Check `dataRegistry.pathInfo?.name` (host root) and `dataRegistry.pathInfo?.items` (own items first, then the sub-model items).
+3. Resolve the entity with `dataRegistry.tupleDefByKey(Entity.tupleKey)`: the root-less `tupleKey` form is resolved by the third lookup fallback.
+4. Two layers with the same `name` but different `uuid` throw at registry construction.

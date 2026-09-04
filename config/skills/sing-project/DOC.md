@@ -128,6 +128,7 @@ Lorsque tu ne respectes pas une consigne :
 - 26/11/25 : début du travail.
 - 26/11/25 : documentation complétée pour la définition des espaces de nom, des entités et des champs (fichier DATA_MODEL.md).
 - 30/08/26 : QUERIES.md, SERVICES.md, DATA_CLASSES.md réalignés sur le chantier moteur de requêtes : `Query<E, PK>` fusionnée (plus de `queryPk`), verbes de lecture et d'écriture plats (`load(where:)`, `insert(rows)`, `updateWhere(set:, where:)`, `delete(where:)`, `upsert(rows, on:)` sur `MergeRows`), nouvelle section sur le builder du moteur ouvert par `select()` (jointures, `groupBy`/`project`, CTE, compounds), `insertSelect`/`updateSelect`.
+- 04/09/26 : synchronisation complète sur sing2 `139f81bc` : couches de modèle (`Xxx$Layer`, `ModelLayer`), interfaces de registre (`XxxRegistry<E>`, `XxxServerRegistry`/`XxxClientRegistry` avec fabrique et `modelLayers`, `DataRegistryBase`), `tupleKey`, expressions de référence (`RefFieldExpr` sur `Reference<E>`, `$pointToXXX`, `$keyValue`, `nullSafe`), verbes `insertRow`/`insertRows`, `insertNewRow`, API fluide des selects, recherches typées sur `Xxx$Search`. SUBMODELS.md et MIGRATIONS.md réécrits sur l'API réelle ; SKILL.md et PROJECT_STRUCTURE.md réalignés sur `example/` (pas de `example/orderhub`, build par `build/sing_build.dart`).
 
 ---
 

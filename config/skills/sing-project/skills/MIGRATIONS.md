@@ -1,555 +1,171 @@
 # Migrations & Schema Evolution
 
-This document explains how Sing manages database schema migrations as your model evolves.
+This document explains how Sing brings a database up to the version of the model.
 
-## Overview
+## 1. Overview
 
-Sing's migration system:
-- **Detects schema changes** by comparing your model with the database
-- **Executes custom migrations** before and after Sing's schema DDL
-- **Tracks versions** to determine what needs to be run
-- **Runs** on server startup
+Sing's migration (`sing_server/lib/src/migration/`):
+- **computes the DDL orders** by comparing the model with the introspected database (schemas, tables, columns, indexes, foreign keys, enum tables);
+- **executes custom migration steps** declared in the model, before and after the DDL orders;
+- **tracks versions** per model layer to determine which steps to run;
+- **runs when the application calls it**, typically at server startup, inside one operation and one transaction.
 
-Key principle: **Your model is the source of truth for the database schema**.
+Key principle: **the model is the source of truth for the database schema**.
 
-## How Migrations Work
+## 2. Model versions
 
-### Core Concepts
+### 2.1. Declaration
 
-**Migration Workflow**:
-```
-1. Developer defines migration steps (custom SQL)
-2. Server startup: Compare database version vs. model version
-3. If versions differ: Execute BeforeMigrationStep → Sing DDL → AfterMigrationStep
-4. Update database version when complete
-```
-
-**Version Tracking**:
-- **vBDD** (Database Version): Stored in database or file system or ..., retrieved by `getCurrentVersion()`
-- **vModel** (Model Version): Timestamp from `ServerDataRegistry.version` (from code generation)
-- **Decision**: If `vModel > vBDD`, run migration steps with timestamp in range (vBDD, vModel]
-
-### Migration Class Structure
-
-Developers create migration classes in the model package:
+Versions are declared on the model through `Model.majorVersions` (`sing_model`). The version tree is `MajorVersion` → `MinorVersion` → `PatchVersion`, and a patch carries the steps:
 
 ```dart
-// model/lib/model/[namespace]/[entity].migrations.dart
-import 'package:sing_server/sing_server.dart';
-import 'package:model/server.dart';
-
-class OrderMigrations extends Migrations<Order> {
-  /// Version tracking: Used to determine which steps to run
-  @override
-  int get version => 1;  // Increment when adding migration steps
-
-  /// Migration steps to execute
-  @override
-  List<MigrationStep> get steps => [
-    BeforeMigrationStep(
-      timestamp: 1,  // Executes BEFORE Sing's DDL (if version jumping over this)
-      description: 'Add temporary column for data migration',
-      execute: (context) async {
-        await context.database.query(
-          'ALTER TABLE orders ADD COLUMN status_temp VARCHAR(50);'
-        );
-      },
-    ),
-    // Sing's auto-generated DDL runs here (table creation, column additions, etc.)
-    AfterMigrationStep(
-      timestamp: 2,  // Executes AFTER Sing's DDL
-      description: 'Migrate data from status_temp to status',
-      execute: (context) async {
-        await context.database.query(
-          'UPDATE orders SET status = status_temp WHERE status IS NULL;'
-        );
-        await context.database.query(
-          'ALTER TABLE orders DROP COLUMN status_temp;'
-        );
-      },
-    ),
-  ];
-
-  /// Get current database version (must be implemented by developer)
-  @override
-  Future<int> getCurrentVersion(DataControler dataControler) async {
-    try {
-      final result = await dataControler.query(
-        'SELECT version FROM schema_version ORDER BY version DESC LIMIT 1;'
-      );
-      if (result.isNotEmpty) {
-        return int.parse(result.first['version'].toString());
-      }
-      return 0;  // No migrations run yet
-    } catch (e) {
-      return 0;  // Table doesn't exist yet
-    }
-  }
-
-  /// Set database version after successful migration (must be implemented)
-  @override
-  Future<void> setCurrentVersion(DataControler dataControler, int version) async {
-    await dataControler.query(
-      'INSERT INTO schema_version (version, applied_at) VALUES ($version, NOW());'
-    );
-  }
-}
-```
-
-## Migration Execution Flow
-
-### Server Startup Sequence
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Server Starts                                       │
-└──────────────────┬──────────────────────────────────┘
-                   │
-                   ▼
-        ┌─────────────────────┐
-        │ Create DataRegistry │
-        │ Load ServerEntityDef│
-        └──────────┬──────────┘
-                   │
-                   ▼
-    ┌──────────────────────────────────┐
-    │ Query: getCurrentVersion()        │
-    │ Returns: vBDD (from database)     │
-    │ vModel = ServerDataRegistry.version
-    └──────────────┬───────────────────┘
-                   │
-        ┌──────────┴──────────┐
-        │                     │
-        ▼                     ▼
-    vModel > vBDD       vModel == vBDD
-        │                     │
-        │                     ▼
-        │                 ✅ Ready (no migration needed)
-        │
-        ▼
-  ┌─────────────────────────────────────┐
-  │ For each migration step:             │
-  │   if step.timestamp > vBDD:          │
-  │     Execute the step                 │
-  │   (timestamps order execution)       │
-  └─────────────────────────────────────┘
-        │
-        ├─ BeforeMigrationStep (timestamp <= vModel)
-        ├─ Sing DDL operations
-        ├─ AfterMigrationStep (timestamp <= vModel)
-        │
-        ▼
-  ┌──────────────────────────┐
-  │ setCurrentVersion(vModel)│
-  └──────────────────────────┘
-        │
-        ▼
-  ✅ Ready (migrations complete)
-```
-
-## Example: Renaming an Entity Field
-
-### Scenario
-Rename `status` to `orderStatus` in OrderEntity to avoid naming conflicts.
-
-### Step 1: Define Migration
-
-```dart
-// model/lib/model/orders/order.migrations.dart
-class OrderMigrations extends Migrations<Order> {
-  @override
-  List<MigrationStep> get steps => [
-    BeforeMigrationStep(
-      timestamp: 1,
-      description: 'Create orderStatus column',
-      execute: (context) async {
-        await context.database.query(
-          'ALTER TABLE orders ADD COLUMN order_status VARCHAR(50);'
-        );
-      },
-    ),
-    // Sing's DDL will handle the old 'status' column
-    AfterMigrationStep(
-      timestamp: 2,
-      description: 'Migrate data from status to orderStatus',
-      execute: (context) async {
-        await context.database.query(
-          'UPDATE orders SET order_status = status;'
-        );
-        await context.database.query(
-          'ALTER TABLE orders DROP COLUMN status;'
-        );
-      },
-    ),
-  ];
-
-  @override
-  Future<int> getCurrentVersion(DataControler dataControler) async {
-    // Implementation (see above)
-  }
-
-  @override
-  Future<void> setCurrentVersion(DataControler dataControler, int version) async {
-    // Implementation (see above)
-  }
-}
-```
-
-### Step 2: Update Model
-
-```dart
-// model/lib/model/orders/order.dart
-@StdEntityServices()
-class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final customerName = StringField(maxLength: 100);
-  final orderStatus = EnumStringField<OrderStatus>();  // ← Renamed!
-  final totalAmount = DoubleField();
-}
-```
-
-### Step 3: Increment Version
-
-```dart
-class OrderMigrations extends Migrations<Order> {
-  @override
-  int get version => 2;  // Increment to trigger migration
-  // ... steps and implementations
-}
-```
-
-### Step 4: Regenerate and Deploy
-
-```bash
-# Regenerate with new model
-dart run sing_builder generate
-
-# Deploy and start server (migrations run automatically)
-dart run orderhub_server
-```
-
-## Idempotency & Safety
-
-### Sing's Guarantees
-
-Sing's generated DDL operations are **idempotent**:
-- `CREATE TABLE IF NOT EXISTS` (safe if table exists)
-- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` (safe if column exists)
-- `CREATE INDEX IF NOT EXISTS` (safe if index exists)
-
-**Developer Responsibility**: Custom migration steps must also be idempotent.
-
-### Making Custom Steps Idempotent
-
-```dart
-// ❌ BAD: Not idempotent
-AfterMigrationStep(
-  timestamp: 1,
-  description: 'Add column',
-  execute: (context) async {
-    await context.database.query(
-      'ALTER TABLE orders ADD COLUMN status_old VARCHAR(50);'
-    );  // Fails if column already exists
-  },
-),
-
-// ✅ GOOD: Idempotent
-AfterMigrationStep(
-  timestamp: 1,
-  description: 'Add column',
-  execute: (context) async {
-    await context.database.query(
-      'ALTER TABLE orders ADD COLUMN IF NOT EXISTS status_old VARCHAR(50);'
-    );  // Safe to run multiple times
-  },
-),
-
-// Or use conditional check
-AfterMigrationStep(
-  timestamp: 2,
-  description: 'Update data if needed',
-  execute: (context) async {
-    final result = await context.database.query(
-      'SELECT COUNT(*) FROM orders WHERE status_old IS NOT NULL;'
-    );
-    if (result.first['count'] == 0) {
-      // Only update if needed
-      await context.database.query(
-        'UPDATE orders SET status_old = status;'
-      );
-    }
-  },
-),
-```
-
-## Version Comparison & Handling
-
-### Example: Multiple Migrations
-
-When you have several migrations and multiple versions need to run:
-
-```dart
-// Model version = 5 (current)
-// Database version = 2 (last run)
-// Action: Run all steps with timestamp > 2 and <= 5
-
-List<MigrationStep> steps = [
-  BeforeMigrationStep(timestamp: 1, ...),   // Skip (1 <= 2)
-  BeforeMigrationStep(timestamp: 3, ...),   // Run (3 > 2)
-  BeforeMigrationStep(timestamp: 5, ...),   // Run (5 > 2)
-  AfterMigrationStep(timestamp: 4, ...),    // Run (4 > 2)
-];
-
-// Execution order: sorted by timestamp
-// 1. All BeforeMigrationStep steps (ascending timestamp)
-// 2. Sing's DDL operations
-// 3. All AfterMigrationStep steps (ascending timestamp)
-```
-
-### Error Handling
-
-If migration fails, it's your responsibility to:
-1. **Check database state** - Determine what succeeded
-2. **Fix the issue** - Correct the invalid data or SQL
-3. **Restart server** - Migrations re-run from scratch (idempotency)
-
-**Warning**: If your custom steps are NOT idempotent and fail halfway, manual database cleanup may be required.
-
-## Migration Context
-
-The `context` parameter provides database access:
-
-```dart
-class MigrationContext {
-  /// Direct database access
-  final DataControler database;
-
-  /// Current migration step info
-  final String stepDescription;
-  final int stepTimestamp;
-
-  /// Logging
-  final Function(String) log;
-}
-
-// Usage
-BeforeMigrationStep(
-  timestamp: 1,
-  description: 'Complex migration',
-  execute: (context) async {
-    context.log('Step 1: Starting migration');
-
-    final rows = await context.database.query('SELECT COUNT(*) FROM orders');
-    context.log('Found ${rows.first["count"]} orders');
-
-    // Modify data
-    await context.database.query('UPDATE orders SET ...');
-
-    context.log('Migration complete');
-  },
-),
-```
-
-## Best Practices
-
-### ✅ Good: Additive Changes
-
-```dart
-// Safe: Add new nullable column
-class OrderEntity extends ModelEntity {
-  final shippingAddress = StringField(maxLength: 255).nullable();
-}
-
-// Generated migration: ALTER TABLE orders ADD COLUMN IF NOT EXISTS ...
-// No custom steps needed
-```
-
-### ✅ Good: Plan Data Migrations
-
-```dart
-// When changing field type, plan the migration
-BeforeMigrationStep(
-  timestamp: 1,
-  description: 'Create temporary column for migration',
-  execute: (context) async {
-    await context.database.query(
-      'ALTER TABLE orders ADD COLUMN IF NOT EXISTS quantity_new INT;'
-    );
-  },
-),
-
-AfterMigrationStep(
-  timestamp: 2,
-  description: 'Convert quantity from string to int',
-  execute: (context) async {
-    await context.database.query(
-      'UPDATE orders SET quantity_new = CAST(quantity AS INTEGER) WHERE quantity IS NOT NULL;'
-    );
-    await context.database.query(
-      'ALTER TABLE orders DROP COLUMN quantity;'
-    );
-    await context.database.query(
-      'ALTER TABLE orders RENAME COLUMN quantity_new TO quantity;'
-    );
-  },
-),
-```
-
-### ✅ Good: Test Migrations
-
-```bash
-# 1. Test on development database
-export DATABASE_URL=postgres://user:pass@localhost/orderhub_dev
-dart run orderhub_server
-
-# 2. Verify schema
-psql orderhub_dev -c "\d orders"
-
-# 3. Check data
-psql orderhub_dev -c "SELECT COUNT(*) FROM orders;"
-
-# 4. Then deploy to staging/production
-```
-
-### ❌ Bad: Removing Fields Without Migration
-
-```dart
-// Old model
-class OrderEntity extends ModelEntity {
-  final status = StringField();
-  final legacyField = StringField();  // To be removed
-}
-
-// Simply deleting field without migration
-class OrderEntity extends ModelEntity {
-  final status = StringField();
-  // ❌ legacyField removed, data lost!
-}
-```
-
-### ❌ Bad: Non-Idempotent Steps
-
-```dart
-// Problem: If server restarts, runs migration twice
-AfterMigrationStep(
-  timestamp: 1,
-  description: 'Insert default data',
-  execute: (context) async {
-    // ❌ This will fail on second run (duplicate key)
-    await context.database.query(
-      "INSERT INTO order_statuses VALUES ('pending', 'Pending Order');"
-    );
-  },
-),
-
-// Solution: Use INSERT ... ON CONFLICT DO NOTHING
-AfterMigrationStep(
-  timestamp: 1,
-  description: 'Insert default data',
-  execute: (context) async {
-    // ✅ Safe on multiple runs
-    await context.database.query(
-      "INSERT INTO order_statuses VALUES ('pending', 'Pending Order') "
-      "ON CONFLICT (status) DO NOTHING;"
-    );
-  },
-),
-```
-
-## Multi-Environment Migrations
-
-### Development
-
-Migrations run automatically:
-```dart
-final registry = OrderHub$Registry(
-  dataControler: PgDataControler(
-    host: 'localhost',
-    database: 'orderhub_dev',
-  ),
+// model/lib/model/model.dart
+Model createOrderHubModel() => Model(
+  modelName: "OrderHub",
+  rootNameSpace: OrderHubNameSpace(),
+  majorVersions: [V1()],
+  // ...
 );
-// ✅ Migrations run, schema updated
-```
 
-### Production
-
-Requires manual execution:
-```dart
-// 1. Deploy code (but don't start server)
-// 2. Run migrations manually
-dart run sing_builder run-migrations \
-  --database postgres://user:pass@prod/orderhub
-
-// 3. Verify success
-psql -h prod-db orderhub -c "\d orders"
-
-// 4. Start server
-dart run orderhub_server
-```
-
-## Integration with sing_processes
-
-Sing uses `SingMigrationProcess` to coordinate migrations:
-
-```dart
-// From sing_processes package
-import 'package:sing_processes/sing_processes.dart';
-
-class SingMigrationProcess {
-  /// Runs all pending migrations
-  Future<MigrationResult> runMigrations(
-    DataRegistry registry,
-    List<Migrations> allMigrations,
-  );
-
-  /// Reports on migration status
-  Future<MigrationStatus> getStatus();
+// model/lib/model/versions/v1.dart
+class V1 extends MajorVersion {
+  V1()
+    : super(
+        description: "Initial release",
+        minorVersions: [
+          MinorVersion(
+            description: "Order status",
+            patches: [
+              PatchVersion(
+                steps: [
+                  BeforeMigrationStep(
+                    description: "Rename the status column",
+                    execute: (callContext) async {
+                      await callContext.dbConnexion.executeQuery(
+                        "ALTER TABLE orders RENAME COLUMN status TO order_status;",
+                        trace: callContext.runningOperation,
+                      );
+                    },
+                  ),
+                  AfterMigrationStep(
+                    description: "Default status of legacy orders",
+                    execute: (callContext) async {
+                      await callContext.dbConnexion.executeQuery(
+                        "UPDATE orders SET order_status = 'pending' WHERE order_status IS NULL;",
+                        trace: callContext.runningOperation,
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      );
 }
 ```
 
-Reference: `sing_processes/lib/src/migrations/migration_process.dart`
+- `MajorVersion` is abstract: declare one class per major version, with a **default (no-argument) constructor**. The generator instantiates it through this constructor to compute the model version and emits `Xxx$Layer.majorVersions` from it.
+- Every `ModelVersion` (`MajorVersion`, `MinorVersion`, `PatchVersion`) accepts `description`, `releaseDate`, `releaseNotes` and `executeOnEmptyDb` (default `true`; when `false`, the version and everything under it is skipped on a database that has never been migrated).
+- `PatchVersion(steps:)` holds the `MigrationStep`s. Its `description` defaults to the descriptions of its steps.
+- `BeforeMigrationStep` and `AfterMigrationStep` take `description`, `execute` (`Future Function(CallContext context)`) and `alwaysExecute` (default `false`; when `true` the step runs on every migration whatever the recorded version).
 
-## Troubleshooting
+### 2.2. Numbering
 
-### Issue: Migration Fails Midway
+Versions are **numbered by position**, never by hand (`SemanticVersion` `major.minor.patch`): the first `MajorVersion` is `0.0.0`, the next ones increment the major number; each `MinorVersion` increments the minor number, each `PatchVersion` the patch number. `ModelVersions.lastVersion` is the version of the model and `Xxx$Layer.version` carries it as a string (`"0.0.0"` for a model without any version).
+
+### 2.3. Versions and registry
+
+- `ServerDataRegistry.version` / `ownVersion`: the version of the model's own layer (same value).
+- `ServerDataRegistry.modelVersions`: the `majorVersions` of every server layer, numbered as one chain.
+- `ServerDataRegistry.layerVersions`: one `ModelLayerVersions(modelName:, versions:)` per layer, each numbered **independently**, lowest layer first.
+- `ServerDataRegistry.layerVersionChain`: `layerVersions` in the form recorded by the application, `"Base=1.1.1;OrderHub=2.1.8"` (`formatVersionChain`, parsed back by `parseVersionChain`).
+
+A [sub-model](SUBMODELS.md) numbers its versions without knowing the applications built on it: its patches are compared to its own layer's recorded version.
+
+## 3. Running a migration
+
+### 3.1. Application side
+
+The framework does not store the reached version: the application records `layerVersionChain` where it wants (file, table, ...) and passes it back. `migrateDatabase` requires a `CallContext`, obtained from `startOperation` (from `example/orderhub_server/bin/orderhub_server.dart`):
+
+```dart
+Future migrateDatabase(
+  OrderHubServerRegistry dataRegistry,
+  Account migrationAccount,
+) async {
+  final currentVersionChain = getCurrentVersionChain();
+  if (currentVersionChain == dataRegistry.layerVersionChain) return;
+  await dataRegistry.startOperation(
+    "Run migration",
+    executor: (callContext) async {
+      await dataRegistry.migrateDatabase<OrderHubServerRegistry>(
+        callContext,
+        fromVersionChain: currentVersionChain,
+      );
+      await setCurrentVersionChain(dataRegistry, dataRegistry.layerVersionChain);
+    },
+    userAccount: migrationAccount,
+  );
+}
+```
+
+`migrateDatabase<R extends ServerDataRegistry>(callContext, {String? fromVersionChain})` returns `dataRegistry.version`. `fromVersionChain` null, empty or unparseable means an empty database: every step runs (except versions with `executeOnEmptyDb: false`). A layer missing from the chain replays all of its steps.
+
+### 3.2. Execution order
 
 ```
-Error: Cannot apply migration, constraint violation
+startOperation(...) → CallContext
+  │
+  ▼
+Migration(dataRegistry:, fromVersionChain:).migrateDatabase(callContext)
+  │
+  ├─ 1. every BeforeMigrationStep of the selected patches, layer by layer
+  ├─ 2. DDL orders computed from the model vs. the introspected database
+  │       (create/drop schemas and tables; add, update and DROP columns absent
+  │        from the model; primary keys; indexes; enum rows; foreign keys
+  │        created DEFERRABLE INITIALLY DEFERRED NOT VALID)
+  ├─ 3. every AfterMigrationStep of the selected patches, layer by layer
+  └─ 4. SET CONSTRAINTS ALL IMMEDIATE, then VALIDATE CONSTRAINT on the foreign
+        keys still unvalidated
 ```
 
-**Solution**:
-```bash
-# 1. Check what succeeded
-psql orderhub -c "\d orders"
+A step is selected when `alwaysExecute` is true or when its patch version is greater than the version recorded for its layer. Selected steps run in declaration order.
 
-# 2. Fix the issue (correct data or SQL)
-psql orderhub -c "UPDATE orders SET ... WHERE ..."
+Everything runs on the connection of `callContext`, in **one transaction**: the DDL orders see what a `BeforeMigrationStep` wrote, an `AfterMigrationStep` can repopulate the tables the DDL created, and a failure at any step rolls back the whole migration (PostgreSQL DDL is transactional). The operation is traced under `OperationType.migration`.
 
-# 3. Restart server (idempotent steps re-run safely)
-dart run orderhub_server
-```
+### 3.3. Writing a step
 
-### Issue: Database Version Out of Sync
+`execute` receives the `CallContext` of the migration. Raw SQL goes through `callContext.dbConnexion.executeQuery(sql, trace: callContext.runningOperation, params:, rowCount:)`; the [query API](QUERIES.md) and the [services](SERVICES.md) of the model are usable as in any operation, on the structures existing at that point (before or after the DDL orders).
 
-```
-Error: Database version 3, model version 5 (gap > 1)
-```
+Steps must be **idempotent** (a step can be replayed when the recorded chain is lost or when `alwaysExecute` is true): use `IF EXISTS` / `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, or check the state before writing.
 
-**Solution**:
-```bash
-# 1. Check database version
-psql orderhub -c "SELECT * FROM schema_version ORDER BY version DESC LIMIT 1;"
+## 4. Typical cases
 
-# 2. Check model version (from generated code)
-grep "const version" model/lib/sing/server_registry.dart
+### 4.1. Additive change
 
-# 3. If database behind, delete intermediate versions and let migration run
-psql orderhub -c "DELETE FROM schema_version WHERE version > 3;"
-```
+Adding a nullable field, an entity, an index: no step needed, the DDL orders cover it.
 
----
+### 4.2. Renaming or removing a field with data to keep
 
-**Related Code**:
-- Migration implementation: `sing_server/lib/src/migrations/migrations.dart`
-- Migration orchestration: `sing_processes/lib/src/migrations/migration_process.dart`
-- Example entities: `example/orderhub/model/lib/model/`
+The model only knows the target name: without a step, the DDL orders add the target column and **drop** the old one (a column absent from the model is dropped, a table absent from the model too). Declare a `BeforeMigrationStep` that renames the old column (or copies its data elsewhere): the DDL orders are computed after the `BeforeMigrationStep`s and then see the renamed column as already there (see § 2.1). An `AfterMigrationStep` completes the data once the structures exist.
 
+### 4.3. Seed data
+
+An `AfterMigrationStep` with `ON CONFLICT DO NOTHING`, or `alwaysExecute: true` when the data must be reconciled on every migration.
+
+### 4.4. Data conversion irrelevant on a fresh database
+
+Set `executeOnEmptyDb: false` on the version: its steps only make sense to convert pre-existing rows, and would otherwise act on seed data that nothing references yet.
+
+## 5. Troubleshooting
+
+- **Migration fails**: nothing is committed. Fix the step or the data, restart the application; the whole migration runs again.
+- **Chain recorded in an older or unknown form**: `parseVersionChain` returns null and the database is migrated as an empty one (all steps of all layers run). Make sure they are idempotent.
+- **`Sub-version ... already has a version assigned`**: a `ModelVersion` instance is shared between two trees. `Xxx$Layer.majorVersions` must return fresh instances on every read (the registry numbers them twice: merged chain, then per layer); the generated layer does so as long as each `MajorVersion` subclass builds its tree in its default constructor.
+
+## 6. See Also
+
+- [Server application](APP_SERVER.md) for the startup sequence.
+- [Sub-models](SUBMODELS.md) for layer versions.
+- Migration implementation: `sing_server/lib/src/migration/migration.dart`, `sing_server/lib/src/migration/migrator/`.

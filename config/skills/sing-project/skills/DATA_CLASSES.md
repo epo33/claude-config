@@ -33,11 +33,11 @@ dataValues.orderNumber.value = 123456789;
 dataValues.orderNum.value = "QF-1254-5689";   
 
 // Dart compiler : KO. orderDate is a property of Order$Instance but DateTime is not a valid UtcDateTime value.
-dataValues.orderDate = DateTime.now();
+dataValues.orderDate.value = DateTime.now();
 
 // Dart compiler : OK. orderDate is a property of Order$Instance and UtcDateTime.now() is a valid UtcDateTime value.
 // Local/UTC datetimes are never mixed.
-dataValues.orderDate = UtcDateTime.now();
+dataValues.orderDate.value = UtcDateTime.now();
 ```
 
 **Consequence**:
@@ -97,14 +97,14 @@ order.orderNumber.value = "QF-123";  // Type-safe, compiler-checked
 
 ### 1.3. Common Usage Pattern
 
-## 4. DataLoader Class
+## 2. DataLoader Class
 
-### 4.1. Overview
+### 2.1. Overview
 The DataLoader class is central in the Sing framework (like DataRowValues) for everything related to data access, both through [queries](QUERIES.md) and calls to [services](SERVICES.md).
 
 In a client application for example:
 ```dart
-final orders = $Orders.services(dataRegistry).search(status:Search.equal(OrderStatus.pending));
+final orders = $Order.services(dataRegistry).search(status: Search.equal(OrderStatus.pending));
 ```
 or in a server-side service:
 ```dart
@@ -125,7 +125,7 @@ final pendingCount = await $Order.query(callContext)
   .load(where: (fields) => fields.status.$equal(OrderStatus.pending))
   .count();
 
-// Exécute sans récupérer de données
+// Runs without reading rows back
 await $Order.query(callContext)
   .delete(where: (fields) => fields.status.$equal(OrderStatus.cancelled))
   .execute();
@@ -134,59 +134,59 @@ await $Order.query(callContext)
 Examples (on client side):
 ```dart
 // We are sure that an order with primary key uuid exists.
-final order = await $Orders.services(dataRegistry).load.thisKey(uuid).exactlyOne();
+final order = await $Order.services(dataRegistry).loadThisKey(key: uuid).exactlyOne();
 
 // Maybe an order with primary key uuid.
-final order = await $Orders.services(dataRegistry).load.thisKey(uuid).one();
+final order = await $Order.services(dataRegistry).loadThisKey(key: uuid).one();
 
 // List of pending orders
-final pendingOrders = await $Orders.services(dataRegistry).search(status:Search.equal(OrderStatus.pending)).listValues();
+final pendingOrders = await $Order.services(dataRegistry).search(status: Search.equal(OrderStatus.pending)).listValues();
 ```
 
-### 4.2. Façonner les résultats
+### 2.2. Shaping Results
 
-#### Limiter les champs retournés
+#### Limiting Returned Fields
 ```dart
 final orders = await $Order.query(callContext).load()
   .fields((fields) => [
     fields.orderNumber,
     fields.totalAmount,
-    fields.customer.name,  // Navigation dans la référence
+    fields.customer.name,  // Reference navigation
   ])
   .listValues();
 
-// Note : les clés primaires sont TOUJOURS retournées même si non demandées
+// Note: primary keys are ALWAYS returned even when not requested
 ```
 
-#### Eager loading de références
+#### Eager Loading of References
 ```dart
 final orders = await $Order.query(callContext).load()
   .resolve((fields) => [
-    fields.customer,        // Charge la référence customer
-    fields.customer.address // Charge aussi l'adresse du customer
+    fields.customer,        // Loads the customer reference
+    fields.customer.address // Also loads the customer's address
   ])
   .listValues();
 
-// Accès sans requête supplémentaire
+// Access without an extra query (throws when the reference is not resolved)
 for (final order in orders) {
-  final customerName = order.customer.dataRowValues?.name.value;
+  final customerName = order.customer.dataRowValues.name.value;
 }
 ```
 
-#### Tri des résultats
+#### Sorting Results
 ```dart
-// Tri ascendant
+// Ascending
 .sort((fields) => [fields.orderDate, fields.orderNumber])
 
-// Tri descendant (préfixe -)
+// Descending (prefix -)
 .sort((fields) => [-fields.orderDate])
 
-// Tri mixte
+// Mixed
 .sort((fields) => [fields.status, -fields.totalAmount])
 
-// Note : avec limit, la clé primaire est ajoutée automatiquement à la fin
+// Note: with limit, the primary key is appended automatically
 ```
-#### Synthèse
+#### Summary
 
 | Method         | Purpose                                                                                                                                                                                                                                                                                                                                                                                                 |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -194,7 +194,7 @@ for (final order in orders) {
 | `resolve(...)` | Return the requested data (e.g., `orderLines`) but also the data associated with related entities in the same call (and therefore **the same database transaction** for client->server calls)                                                                                                                                                                                                           |
 | `sort(...)`    | Sort data before returning it. In [queries](QUERIES.md), data is sorted **by the database**. If the `limit` parameter is provided to the call of `listValues()` or `list()`, the framework **systematically** adds the primary key (if it exists) of the entity **at the end** of the list of sort fields. If the entity does not define a primary key and no sort is requested, an exception is thrown |
 
-### 4.3. Complete example
+### 2.3. Complete example
 
 ```dart
 final orders = $Order
@@ -202,27 +202,26 @@ final orders = $Order
                    .load(where: (fields) => fields.status.$equal(OrderStatus.pending))
                    .fields( (fields) => [fields.orderNumber, fields.customer.name])
                    .resolve( (fields) => [fields.customer])
-                   .sort( (fields) => [-fields.orderData])
+                   .sort( (fields) => [-fields.orderDate])
                    .listValues(limit:100);
 ```
 
-### `DataRowValues` and `DataLoader`
+### 2.4. `DataRowValues` and `DataLoader`
 
 The `DataRowValues` and `DataLoader` classes alone ensure a major part of Sing's requirements: guaranteeing controlled access to application data. The impacts of any modification in the data model definitions will be clearly visible (by the compiler) as soon as the model is rebuilt.
 
 #### Important Note
 If the `fields(...)` method is used before reading data (`listValue()` or `list()`), the returned data **will not contain** all entity fields but only those explicitly specified (exception: primary keys are **always** returned even if not requested by `fields(...)`). Example:
 ```dart
-final order = await $Orders
+final order = await $Order
                .services(dataRegistry)
-               .load
-               .thisKey(uuid)
-               .fields( (fields) => [fields.orderNumber, fields.custom.name])
+               .loadThisKey(key: uuid)
+               .fields( (fields) => [fields.orderNumber, fields.customer.name])
                .exactlyOne();
-final date = order.orderData.value;            // Fake value
+final date = order.orderDate.value;            // Fake value
 ```
 
-## 2. DataRow Class
+## 3. DataRow Class
 
 `DataRow<E>` is an essentially technical class. It encapsulates a record of entity `E`, the value of its fields (`values` property), and its status (`state` property).
 

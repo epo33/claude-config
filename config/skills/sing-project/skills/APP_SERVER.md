@@ -2,7 +2,9 @@
 
 ## 1. Overview
 
-A Sing server application is **by definition** an application that depends on the model package (e.g. `model/`) and instantiates the class derived from `ServerDataRegistry` produced during model construction (e.g. `OrderHub$Registry(dataControler:...)`). The `dataControler` parameter provides the `sing_server` framework with access to the database where the data structures (schemas, tables, indexes, ...) of the model are stored. 
+A Sing server application is **by definition** an application that depends on the model package (e.g. `model/`) and builds its registry through the factory generated during model construction (e.g. `OrderHubServerRegistry(dataControler: ...)`). The `dataControler` parameter provides the `sing_server` framework with access to the database where the data structures (schemas, tables, indexes, ...) of the model are stored.
+
+`OrderHubServerRegistry` (in `model/lib/sing/server.dart`) is an `abstract interface class` stacking `sing.ServerDataRegistry` and the model interface `OrderHubRegistry<ServerEntityDef>` (generated in `common/lib/src/sing/registry.dart`). Its factory has three named parameters: `dataControler` (required, a `ServerDataControler` such as `PgDataControler`), `debugger` (`DebugPrinter?`) and `debugMode` (`bool`). The concrete class `_OrderHub$Registry extends sing.ServerDataRegistryBase` is private to the generated file: application code names the interface only, never extends it, and never writes `ServerDataRegistry(...)`. The static constant `OrderHubServerRegistry.modelLayers` lists the `ServerModelLayer` instances (`OrderHub$Layer` and the layers of its [sub-models](SUBMODELS.md)) the registry is built from.
 
 ## 2. Basic Sing Server Application
 
@@ -18,8 +20,8 @@ void main(List<String> arguments) async {
 }
 
 // Could be synchronous. All operations are very fast (no database or IO access)
-Future<OrderHub$Registry> createDataRegistry( List<String> arguments) async => 
-    OrderHub$Registry(  
+Future<OrderHubServerRegistry> createDataRegistry( List<String> arguments) async => 
+    OrderHubServerRegistry(  
         dataControler: PgDataControler(  
             endpoint: Endpoint(
             host: "localhost",
@@ -63,31 +65,28 @@ It is essential to have a CallContext instance to call a service or execute requ
 
 Once `dataRegistry` is obtained, the first step of any Sing server application is to ensure that the database is at the version of the model and, if not, [**perform the database migration**](MIGRATIONS.md).
 
+The version reached by the database is the string `dataRegistry.layerVersionChain` (one semantic version per model layer, e.g. `"CoverageBase=1.0.0;Coverage=1.2.0"`). Storing it is the application's job (file, table, ...). `migrateDatabase<R>(callContext, fromVersionChain:)` replays, for each layer, the migration steps above the recorded version, then the DDL orders, and returns `dataRegistry.version` (a `String`). `fromVersionChain: null` (or an unparseable chain) treats the database as never migrated. Example (from `example/orderhub_server/bin/orderhub_server.dart`):
+
 ```dart
 Future migrateDatabase(
-  OrderHub$Registry dataRegistry,
+  OrderHubServerRegistry dataRegistry,
   Account migrationAccount,
 ) async {
-  // Obtain the current version from the database (from file or database or ...)
-  final currentVersion = getCurrentVersion();
-  // The version of the model is its last rebuild timestamp.
-  final registryVersion = dataRegistry.version;
+  // Obtain the chain recorded by the previous migration (file, database, ...)
+  final currentVersionChain = getCurrentVersionChain();
   // Up to date? Nothing to do.
-  if (currentVersion == registryVersion) return;
-  // The database is newer than the model (invalid model package referenced, old app version, ...). This is an error.
-  if (currentVersion != null && currentVersion.isAfter(registryVersion)) {
-    throw "Database version $registryVersion is newer than the model version $currentVersion.";
-  }
+  if (currentVersionChain == dataRegistry.layerVersionChain) return;
+  // A CallContext is mandatory for any database operation.
   await dataRegistry.startOperation(
     "Run migration",
     executor: (callContext) async {
       // Do the job
-      final version = await dataRegistry.migrateDatabase<OrderHub$Registry>(
+      await dataRegistry.migrateDatabase<OrderHubServerRegistry>(
         callContext,
-        fromVersion: currentVersion,
+        fromVersionChain: currentVersionChain,
       );
-      // Save the new version
-      await setCurrentVersion(dataRegistry, version);
+      // Record the reached chain
+      await setCurrentVersionChain(dataRegistry, dataRegistry.layerVersionChain);
     },
     userAccount: migrationAccount,
   );
@@ -134,7 +133,7 @@ void main(List<String> arguments) async {
 class AppSessionManager extends MainSessionManager {
     AppSessionManager( this.dataRegistry);
 
-    final OrderHub$Registry dataRegistry;  // For database access
+    final OrderHubServerRegistry dataRegistry;  // For database access
 
   @override
   Future<sing.Account?> accountFromSessionKey(
@@ -158,9 +157,11 @@ class AppSessionManager extends MainSessionManager {
 
 ### 4.2. Exception Handling
 
-**When an exception** `e` occurs during a service call, the Sing framework returns a `Response` object with:
-- `statusCode`: 400 if `e is AppError` else 500
-- `content`: `e.message` if `e is AppError` else nothing ("Internal error" with no details).
+**When an exception** `e` occurs while `processRequest` handles a request, the Sing framework returns an `HttpResponse` with:
+- `statusCode`: 400 if `e is AppError` else 500 (an `HttpResponse` thrown by the code is returned as is)
+- `content`: the JSON of `e.toJson()` if `e is AppError` (`HttpResult.json`), else `e.toString()` (`HttpResult.internalServerError`).
+
+Every response carries the headers `X-Sing-Version` (`dataRegistry.version`) and `X-Sing-Model-Version` (`dataRegistry.compiledAt` in ISO 8601), see `DataRegistry.httpHeader`.
 
 ## 5. See Also
 

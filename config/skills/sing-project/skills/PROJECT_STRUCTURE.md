@@ -9,12 +9,17 @@ A Sing project follows a multi-package structure where the **model** is the sour
 ```
 project_root/
 ├── model/                           # Model definitions (developer-written),
+│   ├── build/
+│   │   ├── sing_build.dart          # `dart run build/sing_build.dart`: rebuilds the generated code
+│   │   └── sing_init.dart           # Re-runs the package initialization
 │   ├── lib/                         # Library code
 │   │   ├── model/                   # Model definitions (developer-written)
-│   │   │   └── model.dart           # Main export file. MUST export `../sing/sing.dart`
-│   │   └── sing/                    # Auto-generated server code (DO NOT CHANGE)
+│   │   │   └── model.dart           # `createXxxModel()` returning the `Model`, root namespace class
+│   │   ├── sing/                    # Auto-generated server code (DO NOT CHANGE)
+│   │   ├── server.dart              # `export 'sing/server.dart';`
+│   │   └── model.dart               # Exports sing_model, sing_server, model definitions, common package
 ├── common/                          # Shared code and types (developer + generated), 
-├── {project}_sing_client/           # Client SDK (auto-generated). 
+├── model_sing_client/               # Client SDK (auto-generated, path set by `Model.clientPackagePath`)
 |
 |                   # Developper code
 |
@@ -55,33 +60,35 @@ The `model` package contains entity definitions and is the most important for un
 
 ```
 model/
+├── build/
+│   ├── sing_build.dart              # Code generation script
+│   └── sing_init.dart               # Package initialization script
 ├── lib/
 │   ├── model/                       # ← Developer-written model definitions
-│   │   │
-│   │   └── [root_namespace]/                    # Root namespace (unique, top-level)
-│   │       ├── root_namespace.dart              # Namespace definition. Sub structure exports
-│   │       ├── entity_a.dart                    # Entity definition at root level
-│   │       ├── [sub_namespace1]/                # Sub-namespace (can contain entities and/or sub-namespaces)
-│   │       │   ├── sub_namespace1.dart          # Namespace definition. Sub structure exports
-│   │       │   ├── entity_b.dart                # Entity definition at sub-namespace level
-│   │       │   ├── entity_c.dart                # Another entity at same level
-│   │       │   └── [sub_sub_namespace1]/        # Nested sub-namespace (recursive nesting allowed)
-│   │       │       ├── sub_sub_namespace.dart   # Namespace definition. Sub structure exports
-│   │       │       ├── entity_d.dart            # Entity at nested level
-│   │       └── [sub_namespace2]/                # Another sub-namespace at root level
-│   │           ├── sub_namespace2.dart          # Namespace definition. Sub structure exports
-│   │           ├── entity_e.dart
-│   │           └── [sub_sub_namespace2]/
-│   │               ├── sub_sub_namespace2.dart  # Namespace definition. Sub structure exports
-│   │               └── entity_f.dart
-│   └── sing/                        # ← Auto-generated server code (DO NOT CHANGE)
+│   │   ├── model.dart                       # `createXxxModel()` and the root namespace class. Sub structure exports
+│   │   ├── entity_a.dart                    # Entity definition at root level
+│   │   ├── [sub_namespace1]/                # Sub-namespace (can contain entities and/or sub-namespaces)
+│   │   │   ├── sub_namespace1.dart          # Namespace definition. Sub structure exports
+│   │   │   ├── entity_b.dart                # Entity definition at sub-namespace level
+│   │   │   ├── entity_c.dart                # Another entity at same level
+│   │   │   └── [sub_sub_namespace1]/        # Nested sub-namespace (recursive nesting allowed)
+│   │   │       ├── sub_sub_namespace.dart   # Namespace definition. Sub structure exports
+│   │   │       ├── entity_d.dart            # Entity at nested level
+│   │   └── [sub_namespace2]/                # Another sub-namespace at root level
+│   │       ├── sub_namespace2.dart          # Namespace definition. Sub structure exports
+│   │       ├── entity_e.dart
+│   │       └── [sub_sub_namespace2]/
+│   │           ├── sub_sub_namespace2.dart  # Namespace definition. Sub structure exports
+│   │           └── entity_f.dart
+│   ├── sing/                        # ← Auto-generated server code (DO NOT CHANGE)
+│   ├── server.dart                  # `export 'sing/server.dart';`
+│   └── model.dart                   # Exports framework, model definitions and common package
 ├── test/                            # Unit tests for model/services
-├── pubspec.yaml                     # Project pubspec
-└── build/                           # Build artifacts (ignore)
+└── pubspec.yaml                     # Project pubspec
 ```
 
 **Key Points About Namespace Structure**:
-- **One root namespace**: There is exactly one root namespace under `model/lib/model/`
+- **One root namespace**: There is exactly one root namespace, declared in `model/lib/model/model.dart` (e.g. `OrderHubNameSpace` in `example/model/lib/model/model.dart`) and passed to `Model(rootNameSpace:)`; its sub-namespaces are directories of `model/lib/model/`
 - **Sub-namespaces**: Multiple sub-namespaces can be nested within the root namespace
 - **Recursive nesting**: Sub-namespaces can contain sub-sub-namespaces indefinitely
 - **Entities at any level**: Entities can exist at any nesting level (root, sub, or deeper)
@@ -147,20 +154,14 @@ The file is placed in the same directory as the entity or namespace definition.
 
 For more details, [see the implementation details of services](SERVICES.md).
 
-### 2.3. Migration Files
+### 2.3. Version Files
 
-If [migration steps](MIGRATIONS.md) are necessary for an entity or namespace, they are defined in a file named:
+[Migration steps](MIGRATIONS.md) belong to the model versions: subclasses of `MajorVersion` (with a default constructor) listed in `Model(majorVersions:)`, each holding its `MinorVersion`s, `PatchVersion`s and `BeforeMigrationStep` / `AfterMigrationStep`s. The framework does not impose their file location; the convention is one file per major version under `model/lib/model/versions/` (e.g. `v1.dart` for `class V1 extends MajorVersion`).
 
-**Pattern**:
-- `{entity_name}.migrations.dart` (snake_case with `.migrations` suffix) for migration steps defined on an entity.
-- `{namespace_name}.migrations.dart` (snake_case with `.migrations` suffix) for migration steps defined on a namespace.
-
-The file is placed in the same directory as the entity or namespace definition.
-
-**When to create**:
-- Renaming fields or entities
+**When to add a step**:
+- Renaming fields or entities with data to keep
 - Data type conversions
-- Schema changes beyond simple column additions
+- Seed data, schema changes beyond what the DDL orders derive from the model
 
 ---
 
@@ -180,8 +181,8 @@ common/
 ```
 
 **Key Points**:
-- `common/lib/src/sing/` contains auto-generated shared types
-- `common/lib/src/sing/` alaways contains a sing.dart file (generated at first build)
+- `common/lib/src/sing/` contains auto-generated shared types: `common.dart` (entity interfaces with their `tupleKey`, `DataRowValues$Xxx` extensions), `searches.dart` (`Xxx$Search` classes), `consts.dart`, `registry.dart` (`XxxRegistry<E>` model interface) and `sing.dart` (export file)
+- `common/lib/src/sing/` always contains a `sing.dart` file (created by the package initialization)
 - Entity **interfaces** are shared (not implementations)
 - Client and server both depend on this for common types definitions (enum, extensions, etc)
 
@@ -189,10 +190,12 @@ common/
 
 ## 4. Server Package Structure
 
-Server implementation (business logic, HTTP handlers, migrations).
+Server implementation (registry creation, migration call, HTTP server). `example/orderhub_server/bin/orderhub_server.dart` shows the minimum: `createDataRegistry` building `OrderHubServerRegistry(dataControler: PgDataControler(...))` and `migrateDatabase` (see [APP_SERVER.md](APP_SERVER.md)). A suggested layout for a larger server:
 
 ```
 {project}_server/
+├── bin/
+│   └── {project}_server.dart        # Entry point
 ├── lib/
 │   ├── processes/                   # Process initialization
 │   │   ├── main.dart                # Entry point
@@ -221,7 +224,7 @@ Server implementation (business logic, HTTP handlers, migrations).
 
 ---
 
-## File Naming Pattern Reference
+## 5. File Naming Pattern Reference
 
 | File Type               | Location                | Pattern                         | Example                 |
 | ----------------------- | ----------------------- | ------------------------------- | ----------------------- |
@@ -229,91 +232,72 @@ Server implementation (business logic, HTTP handlers, migrations).
 | **Entity Class**        | `{entity_name}.dart`    | `{EntityName}Entity`            | `OrderEntity`           |
 | **Custom Services**     | `model/lib/model/[ns]/` | `{entity_name}.services.dart`   | `order.services.dart`   |
 | **Service Mixin**       | `.services.dart`        | `{EntityName}Services`          | `OrderServices`         |
-| **Migrations**          | `model/lib/model/[ns]/` | `{entity_name}.migrations.dart` | `order.migrations.dart` |
-| **Migration Class**     | `.migrations.dart`      | `{EntityName}Migrations`        | `OrderMigrations`       |
-| **Listeners**           | `model/lib/model/[ns]/` | `{entity_name}.listeners.dart`  | `order.listeners.dart`  |
-| **Listener Mixin**      | `.listeners.dart`       | `{EntityName}Listeners`         | `OrderListeners`        |
-| **Faker**               | `model/lib/model/[ns]/` | `{entity_name}.faker.dart`      | `order.faker.dart`      |
-| **Faker Class**         | `.faker.dart`           | `{EntityName}Faker`             | `OrderFaker`            |
-| **Generated EntityDef** | `model/lib/sing/[ns]/`  | `{entity_name}_def.dart`        | `order_def.dart`        |
-| **Generated Services**  | `model/lib/sing/[ns]/`  | `{entity_name}_services.dart`   | `order_services.dart`   |
-| **Generated Search**    | `model/lib/sing/[ns]/`  | `{entity_name}_search.dart`     | `order_search.dart`     |
+| **Model Versions**      | `model/lib/model/versions/` | `v{n}.dart` (convention)    | `v1.dart`               |
+| **Version Class**       | `v{n}.dart`             | `V{n} extends MajorVersion`     | `V1`                    |
+| **Generated Entity**    | `model/lib/sing/[root]/[ns]/` | `{entity_name}.dart` (`$Order`, `_Order$Impl`, `Order$Services`) | `order_hub/orders/order.dart` |
+| **Generated Namespace** | `model/lib/sing/[root]/` | `{namespace_name}.dart`        | `order_hub/orders.dart` |
+| **Generated Registry**  | `model/lib/sing/`       | `server.dart` (`OrderHub$Layer`, `OrderHubServerRegistry`) | `server.dart` |
+| **Generated Searches**  | `model/lib/sing/`, `common/lib/src/sing/` | `server_searches.dart`, `searches.dart` | `Order$Search` |
+| **Generated Interface** | `common/lib/src/sing/`  | `common.dart` (`Order`, `Order$Instance`, `DataRowValues$Order`) | `common.dart` |
 
 ---
 
-## Recognizing Auto-Generated Files
+## 6. Recognizing Auto-Generated Files
 
-### Red Flags: Don't Edit These
+### 6.1. Red Flags: Don't Edit These
 
-Files in `model/lib/sing/` are **always** auto-generated. Never modify:
-- `*_def.dart`
-- `*_services.dart`
-- `*_search.dart`
-- `*_tokens.dart`
-- `server_registry.dart`
-- `server_migrations.dart`
-- `server_json.dart`
-- `server_init.dart`
+Files in `model/lib/sing/`, `common/lib/src/sing/` and `model_sing_client/lib/src/` are **always** auto-generated (header `// Generated by SING. DO NOT MODIFY`). Never modify:
+- `model/lib/sing/server.dart`, `server_common.dart`, `server_exports.dart`, `server_init.dart`, `server_mixins.dart`, `server_searches.dart`, `server_tokens.dart` and the namespace directories
+- `common/lib/src/sing/common.dart`, `consts.dart`, `registry.dart`, `searches.dart`, `sing.dart`
+- `model_sing_client/lib/src/client.dart`, `client_common.dart`, `client_ent.dart`, `client_exports.dart`, `client_init.dart`, `client_mixins.dart`, `client_searches.dart`, `client_svc.dart`, `client_tokens.dart` and the namespace directories
 
-If you need to change these, **modify the model and regenerate**:
+If you need to change these, **modify the model and regenerate** (from `model/`):
 ```bash
-dart run sing_builder generate
+dart run build/sing_build.dart
 ```
 
-### Green Flags: Safe to Edit
+### 6.2. Green Flags: Safe to Edit
 
 These files are developer-written:
-- `model/lib/model/**/*.dart` (all entity definitions)
+- `model/lib/model/**/*.dart` (all entity and namespace definitions)
 - `model/lib/model/**/*.services.dart` (custom services)
-- `model/lib/model/**/*.migrations.dart` (custom migrations)
-- `model/lib/model/**/*.listeners.dart` (event listeners)
-- `model/lib/model/**/*.faker.dart` (test data)
+- `model/lib/model/versions/*.dart` (model versions and migration steps)
 
 ---
 
-## Package Initialization Pattern
+## 7. Package Initialization Pattern
 
-### New Project Setup
+### 7.1. New Project Setup
 
-When creating a new Sing project `myapp`:
+When creating a new Sing project `myapp` (details in [INIT_PROJECT.md](INIT_PROJECT.md)):
 
 ```bash
-# 1. Create model package
-mkdir -p myapp/model/lib/model
-cd myapp/model
-dart pub init
+# 1. Create the model package
+cd myapp
+dart create model
+# add sing_builder (path dependency on the Sing sources) to model/pubspec.yaml dev_dependencies
 
-# 2. Create common package
-mkdir -p ../common/lib/src/sing
-cd ../common
-dart pub init
+# 2. Initialize model, common and model_sing_client packages
+cd model
+dart run sing_builder:init PATH_TO_SING
+# model/pubspec.yaml: path dependencies on sing_model, sing_server, ../common
+# common/pubspec.yaml: path dependency on sing_core
+# model_sing_client/pubspec.yaml: path dependency on sing_client
 
-# 3. Create server package
-mkdir -p ../myapp_server/lib/processes
-cd ../myapp_server
-dart pub init
-
-# 4. Add dependencies (in each pubspec.yaml)
-# model/pubspec.yaml
-dependencies:
-  sing_model: ^0.0.1
-  sing_server: ^0.0.1
-
-# common/pubspec.yaml
-dependencies:
-  sing_core: ^0.0.1
-
+# 3. Create the server package
+cd ..
+dart create myapp_server
 # myapp_server/pubspec.yaml
 dependencies:
-  myapp_model:
+  model:
     path: ../model
-  myapp_common:
-    path: ../common
-  sing_server: ^0.0.1
-  shelf: ^1.0.0
+  sing_server:
+    path: PATH_TO_SING/sing_server
+  sing_postgresql:
+    path: PATH_TO_SING/sing_postgresql
 ```
 
-### Typical Namespace Creation
+### 7.2. Typical Namespace Creation
 
 When adding a new domain (e.g., `Orders`):
 
@@ -332,52 +316,53 @@ touch model/lib/model/orders/order.dart
 # 4. Create services file (if custom logic needed)
 touch model/lib/model/orders/order.services.dart
 
-# 5. Regenerate
-dart run sing_builder generate
+# 5. Regenerate (from model/)
+dart run build/sing_build.dart
 
-# Generated files appear in:
-# - model/lib/sing/orders/order_def.dart
-# - model/lib/sing/orders/order_services.dart
-# - model/lib/sing/orders/order_search.dart
-# - common/lib/src/sing/orders/order.dart (interface)
+# Generated code appears in:
+# - model/lib/sing/{root}/orders/order.dart ($Order, _Order$Impl, Order$Services)
+# - model/lib/sing/{root}/orders.dart (Orders namespace)
+# - model/lib/sing/server_searches.dart, common/lib/src/sing/searches.dart (Order$Search)
+# - common/lib/src/sing/common.dart (Order interface, Order$Instance, DataRowValues$Order)
+# - model_sing_client/lib/src/{root}/orders/... (client side)
 ```
 
 ---
 
-## Locating Code in a Project
+## 8. Locating Code in a Project
 
-### "Where is the X entity defined?"
+### 8.1. "Where is the X entity defined?"
 
 ```
 Entity Definition → model/lib/model/{namespace}/{entity_name}.dart
-Generated Server Code → model/lib/sing/{namespace}/{entity_name}_*.dart
-Shared Interface → common/lib/src/sing/{namespace}/{entity_name}.dart
+Generated Server Code → model/lib/sing/{root}/{namespace}/{entity_name}.dart
+Shared Interface → common/lib/src/sing/common.dart (class {EntityName}, static tupleKey)
 ```
 
-### "Where are the custom services for Order?"
+### 8.2. "Where are the custom services for Order?"
 
 ```
 Custom Logic → model/lib/model/orders/order.services.dart
-Generated Services → model/lib/sing/orders/order_services.dart (READ-ONLY)
+Generated Services → model/lib/sing/{root}/orders/order.dart, class Order$Services (READ-ONLY)
 ```
 
-### "Where are migrations defined?"
+### 8.3. "Where are migrations defined?"
 
 ```
-Custom Steps → model/lib/model/{namespace}/{entity_name}.migrations.dart
-Generated DDL → model/lib/sing/server_migrations.dart (READ-ONLY)
+Version tree and steps → MajorVersion subclasses listed in Model(majorVersions:) (model/lib/model/versions/ by convention)
+DDL orders → computed at run time by migrateDatabase from the model and the database (no generated file)
 ```
 
-### "Where do I handle HTTP requests?"
+### 8.4. "Where do I handle HTTP requests?"
 
 ```
-Routing → {project}_server/lib/processes/main.dart
-Handlers → {project}_server/lib/handlers/*.dart
+Entry point → {project}_server/bin/{project}_server.dart
+Sing services → dataRegistry.processRequest(request:, sessionManager:) mounted on a route (see APP_SERVER.md)
 ```
 
 ---
 
-## Best Practices
+## 9. Best Practices
 
 ### ✅ Good: Follow Naming Conventions
 
@@ -459,6 +444,7 @@ class OrderEntity extends ModelEntity {
 ---
 
 **Related Code**:
-- Example: `example/orderhub/model/lib/model/`
-- Generated: `example/orderhub/model/lib/sing/`
+- Example: `example/model/lib/model/`
+- Generated: `example/model/lib/sing/`, `example/common/lib/src/sing/`, `example/model_sing_client/lib/src/`
+- Server application: `example/orderhub_server/bin/orderhub_server.dart`
 

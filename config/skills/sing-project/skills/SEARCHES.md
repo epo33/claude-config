@@ -19,10 +19,17 @@ $Order.services(dataRegistry).search(...)
 During model construction, [a search parameters class](GENERATED_CODE.md) is generated for each model entity whose definition is decorated with `@Searchable` (e.g., `Order$Search` for the `Order` entity).
 [Read this to reliably determine search parameters on an entity](GENERATED_CODE.md).
 
+`Order$Search<E extends Order>` extends `SearchOnEntity<E>` and declares every parameter of the `search` service. Its constructor takes them as optional named parameters; `copyWith(...)` merges a set of parameters into an existing search. The `search` service itself takes the same parameters, plus `filters` (a whole `Order$Search`) and, server side, `callContext`.
+
 Parameters can be typed as:
-- `SearchOnEntity<E>` for entity fields that are references (FK). In this case, another parameter exists to search on the **value** of the foreign key. Example: for a `customer` field that references a `Customer` entity whose primary key is of type `String`, two parameters exist in the search class: `SearchOnEntity<Customer>? customer` and `SearchOnField<String>? refToCustomer`.
+- The generated search class of the referenced entity for entity fields that are references (FK). In this case, another parameter exists to search on the **value** of the foreign key, named with the `refTo` prefix. Example: for a `customer` field that references a `Customer` entity whose primary key is of type `String`, two parameters exist in `Order$Search`: `Customer$Search<Customer>? customer` and `SearchOnField<String>? refToCustomer`. When the primary key of the referenced entity is itself a reference (e.g. `ParentProfile` keyed by `ReferenceTo<ParentEntity>().primaryKey()` in `coverage/coverage_model`), the `refTo` parameter is typed on the entity that key points at: `SearchOnField<Reference<Parent>>? refToProfile`.
 - Parameters `SearchOnField<T>` for each entity field (`T` is the type of the field).
-- Parameters with simple scalar types ([one of the possible field types listed here](DATA_MODEL.md) except references) for fields decorated with `@SearchOnlyField()` in the entity definition.
+- Parameters with simple scalar types ([one of the possible field types listed here](DATA_MODEL.md) except references) for fields decorated with `@SearchOnlyField()` in the entity definition (e.g. `bool? test` on `Order$Search`). They are held in `searchOnlyValues`, not in `filters`.
+- `SearchOnForeignField<E, OrderLine>? whereOrderLineOrder` for each reference field of another entity pointing at this one (here `OrderLine.order`): a criterion on the children of the searched rows. See [reverse lookups](CONCEPTS_RELATIONSHIPS.md).
+
+`filters` (a `Map<String, SearchOn?>`) lists the declared criteria of the class, `searchOnlyValues` the `@SearchOnlyField` values. In an [entity inheritance chain](DATA_MODEL.md), the search class of a descendant extends the one of its ancestor (`Cat$Search<E extends Cat> extends Animal$Search<E>`), and the `search` service of every entity of the chain declares its `filters` parameter on the **root** class (`Animal$Search<Animal>? filters`), since Dart forbids narrowing a parameter type in an override.
+
+Each criterion travels as a JSON object carrying a `$kind` key naming its class; see [Data exchange](AUTO_JSON.md).
 
 ### 1.1. Using SearchOnField Filter
 
@@ -36,12 +43,14 @@ SearchOnField<T> (abstract class)
 ├── SearchOnNumeric<T> (abstract class)
 │   ├── SearchOnInt
 │   └── SearchOnFloat
-└── SearchOnDateTime<T> (sealed class)
-    ├── SearchOnLocalDateTime
-    ├── SearchOnUtcDateTime
-    └── SearchOnDateOnly
+├── SearchOnDuration extends SearchOnField<Duration>
+├── SearchOnDateTime<T> (sealed class)
+│   ├── SearchOnLocalDateTime
+│   ├── SearchOnUtcDateTime
+│   └── SearchOnDateOnly
+└── CompoundSearchOnField<T>
 ```
-The generic type is that of the entity field.
+The generic type is that of the entity field. Server side, the `applyFilters(fieldExpr)` extension of `sing_server` turns a criterion into a [predicate](QUERIES.md); on a reference field, the criterion applies to the key the column stores (`$keyValue`).
 
 ### 1.3. Equality / Inequality
 
@@ -162,15 +171,49 @@ Search.equal('premium') | Search.equal('vip')
 
 ### 1.10. Usage
 
-Used with entity search operations to filter data.
+Used with entity search operations to filter data. The `search` service returns a `DataLoader<E>` (`list()`, `listValues()`, `first()`, `count()`, ...).
 
 ```dart
-// Product search
-final results = await db.products.search(
-  stockQuantity: SearchOnInt(value: 5, type: SearchOnNumericType.lessThan),
-  sku: SearchOnString(text: 'FG-', type: SearchOnStringType.prefix, caseSensitive: false)
+// Product search, server side
+final results = await $Product.services(callContext).search(
+  callContext: callContext,
+  stockQuantity: SearchOnInt(value: 5, type: .lessThan),
+  sku: SearchOnString(text: "FG-", type: .prefix, caseSensitive: false),
+).listValues();
+
+// Same search, client side
+final results = await $Product.services(dataRegistry).search(
+  stockQuantity: SearchOnInt(value: 5, type: .lessThan),
+  sku: SearchOnString(text: "FG-", type: .prefix, caseSensitive: false),
+).listValues();
+```
+
+### 1.11. Search Through a Reference
+
+A parameter typed on the search class of a referenced entity filters the searched rows on the rows they point at. The criteria of that nested search are composed exactly as a direct search on the referenced entity would be: its declared filters, its foreign-field filters, its `$applySearchOnlyFilters` and its `$applyMixinFilters` all contribute (`buildEntityWhere` in `sing_server`), so visibility filters of the referenced entity apply through the reference.
+
+```dart
+// Orders of customers whose name starts with "Du", key of the customer known
+$Order.services(callContext).search(
+  callContext: callContext,
+  customer: Customer$Search(name: SearchOnString(text: "Du", type: .prefix)),
+);
+$Order.services(callContext).search(
+  callContext: callContext,
+  refToCustomer: Search.equal(customerUuid),
+);
+
+// Orders having at least one line of a given product (reverse lookup)
+$Order.services(callContext).search(
+  callContext: callContext,
+  whereOrderLineOrder: SearchOnForeignField(
+    fieldName: "order",
+    filters: OrderLine$Search(refToProduct: Search.equal(productUuid)),
+  ),
 );
 ```
+
+`SearchOnForeignField<PK, FK>` names the searched entity (`PK`) and the entity holding the reference (`FK`); `fieldName` is the field of `FK` pointing at `PK`. Its JSON adapter is `SearchOnForeignFieldAdapter<PK, FK>`.
 
 ## 2. Extended Search Criteria
 
@@ -189,7 +232,9 @@ Predicate? $applySearchOnlyFilters(
 ```
 - Return a [predicate](QUERIES.md).
 
-Example:
+The override is called on every standard search of the entity, including a search reaching the entity through a reference field. `$applyMixinFilters` (same signature) is the hook reserved to generic service mixins (validity, active, ...): it contributes independently, so an entity override of `$applySearchOnlyFilters` cannot drop it.
+
+Example (`example/model/lib/model/orders/order.services.dart`, `test` being a `@SearchOnlyField()` of `OrderEntity`):
 ```dart
 @override
 Predicate? $applySearchOnlyFilters(
@@ -197,32 +242,31 @@ Predicate? $applySearchOnlyFilters(
   Order$Search filters,
   EntityFieldsExpr<Order> fields,
 ) {
-  final hasLines = filters.hasLines;
-  final minAmount = filters.minAmount;
-  final customerRef = filters.customerRef;
-
+  final test = filters.test;
   return Predicate.and([
-    // Call parent filter
     super.$applySearchOnlyFilters(callContext, filters, fields),
-
-    // Always exclude deleted records
-    fields.deleted.$equal(false),
-
-    // Conditional filters
-    if (minAmount != null)
-      fields.totalAmount.$greaterOrEqual(minAmount),
-
-    if (customerRef != null)
-      fields.customer.$samePk(customerRef),
-
-    if (hasLines == true)
-      $OrderLine.existsOrderLine(callContext)(
-        where: (line) => line.order.$equalExpr(fields.uuid),
-      )
-    else if (hasLines == false)
-      $OrderLine.notExistsOrderLine(callContext)(
-        where: (line) => line.order.$equalExpr(fields.uuid),
-      ),
+    if (test == true) fields.orderNumber.$startsWith(testOrderPrefix),
+    if (test == false) fields.orderNumber.$startsWith(testOrderPrefix).$not(),
   ]);
 }
 ```
+
+Example with a correlated subquery on the children (`coverage/coverage_model/lib/model/relations/parent.services.dart`, `childLabel` being a `@SearchOnlyField()` of `ParentEntity`):
+```dart
+@override
+Predicate? $applySearchOnlyFilters(
+  CallContext callContext,
+  Parent$Search filters,
+  EntityFieldsExpr<Parent> fields,
+) {
+  final childLabel = filters.childLabel;
+  if (childLabel == null) return null;
+  return $Child.existsChild(callContext)(
+    where: (child) =>
+        child.parent.$keyValue.$equalExpr(fields.uuid) &
+        child.label.$equal(childLabel),
+  );
+}
+```
+
+A reference field expression (`fields.customer`) compares to a known key with `$pointToKey(key)`, to a row with `$pointToRow(row)`, to a `Reference` with `$pointToReference(ref)`; `$keyValue` reads the stored key as a `ValueExpr<PK>` for correlations and `$isInList`. See [Queries](QUERIES.md).

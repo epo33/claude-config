@@ -46,30 +46,31 @@ Sing follows a **model-first approach**:
 
 ## 3. Example Project
 
-The **`example/orderhub`** directory contains a complete example:
-- `model/` - Order, OrderLine, Product entities with relationships
-- `common/` - Shared enumerations (OrderStatus, PaymentMethod, etc.)
+The **`example/`** directory contains the OrderHub example:
+- `model/` - Order, OrderLine, OrderAuditTrace, Customer, Address and Product entities with relationships (`lib/model/`), generated server code (`lib/sing/`), build script (`build/sing_build.dart`)
+- `foundation/` - Independent Sing model package providing the `AuditTraceEntity` base extended by `OrderAuditTraceEntity`; generated and built before `model/`
+- `common/` - Shared enumerations, DTOs and generated common code (`lib/src/sing/`, including the `OrderHubRegistry` interface)
 - `model_sing_client/` - Auto-generated client API
-- `orderhub_server/` - Backend server implementation
-- `orderhub_client/` - Flutter client application
+- `orderhub_server/` - Server package placeholder
 
 This example demonstrates:
 - Multi-namespace model design
 - One-to-Many relationships with cascade deletion
-- Custom service implementation (adding orders with line items)
+- Custom service implementation (`*.services.dart` files next to entities)
+- Cross-package model dependency (`foundation` → `model`)
 - Server-client separation
 
-Use the orderhub example as reference for implementing similar applications.
+Use the OrderHub example as reference for implementing similar applications.
 
 ## 4. Important Notes for LLM Agents
 
 - **Always check entity definitions first**: The model is the source of truth
 - **Generated code is sacred**: Don't modify files in `model/lib/sing/`, `common/lib/src/sing` or `model_sing_client/lib` manually - regenerate instead
-- **Regenerate or rebuild code**: execute `dart run model/bin/sing_build.dart`. [Generated code principles](./skills/GENERATED_CODE.md)
+- **Regenerate or rebuild code**: execute `dart run build/sing_build.dart` from the model package. [Generated code principles](./skills/GENERATED_CODE.md)
 - **Use mixins for service composition**: Don't create monolithic service classes
 - **Type safety**: Leverage compile-time checking - avoid `dynamic` and string-based access
-- **Patterns matter**: Follow examples in orderhub/ for consistency
-- **Reference existing code**: Before creating new patterns, check how orderhub/ solves similar problems
+- **Patterns matter**: Follow examples in `example/` for consistency
+- **Reference existing code**: Before creating new patterns, check how `example/` solves similar problems
 - **`$` prefix convention**: Field/method names starting with `$` exist in some framework classes. This **avoids conflicts** with identifiers defined by the developer in the model (entity, field, service, namespace; no entity, namespace, service, or field identifier can contain `$`). These methods or fields can be legitimately used.
 
 ## 5. Reference Documentation Location

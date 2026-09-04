@@ -4,18 +4,20 @@ Une application Sing cliente est **par définition** une application qui dépend
 
 ## Basic Sing Client Application
 
-Une application Sing cliente **doit** instancier la classe dérivée de `ClientServerRegistry` définie dans le `model_sing_client` (eg `OrderHub$Registry` dans `model_sing_client/lib/client.dart`).
+Une application Sing cliente **doit** construire son registre par la fabrique de l'interface générée dans `model_sing_client/lib/src/client.dart` (exportée par `model_sing_client/lib/client.dart`), eg `OrderHubClientRegistry(dataControler: ...)`. `OrderHubClientRegistry` est une `abstract interface class` qui empile `sing.ClientDataRegistry` et l'interface de modèle `OrderHubRegistry<ClientEntityDef>` (générée dans `common/lib/src/sing/registry.dart`) ; sa fabrique prend `dataControler` (requis, un `ClientDataControler`) et `debugger` (`DebugPrinter?`). L'implémentation `_OrderHub$Registry extends sing.ClientDataRegistryBase` est privée au fichier généré : le code applicatif nomme l'interface, ne l'étend pas et n'écrit jamais `ClientDataRegistry(...)`. La statique `OrderHubClientRegistry.modelLayers` liste les `ModelLayer` (`OrderHub$Layer` et ceux des [sous-modèles](SUBMODELS.md)) dont le registre est construit. Les chaînes d'accès générées `OrderHub$Ent`/`OrderHub$Svc` typent leur `$dataRegistry` sur `OrderHubClientRegistry`.
 
 ```dart
 // In main function (Flutter app probably but can be a command line tool).
 Future<void> main() async {
     // No network call, very fast operation.
-    final dataRegistry = OrderHub$Registry( dataControler : AppDataControler());
+    final dataRegistry = OrderHubClientRegistry(
+      dataControler: AppDataControler(Uri.parse("https://host/app")),
+    );
     // Call services, ...
 }
 
 class AppDataControler implements sing.ClientDataControler {
-    AppDataControler( this.singServerUri)
+    AppDataControler( this.singServerUri);
 
     @override
     final Uri singServerUri;
@@ -29,8 +31,22 @@ class AppDataControler implements sing.ClientDataControler {
     // Use HTTP client library to call path and return Response (dio, ...)
   }
 
+  @override
+  void onError(Object error, StackTrace stackTrace) {
+    // Report errors raised by service calls
+  }
+
+  // Checks performed on each service call against the server headers
+  @override
+  bool get checkVersion => true;
+  @override
+  bool get checkModelVersion => true;
+  @override
+  bool get checkServiceSignature => true;
 }
 ```
+
+`sing_client` fournit `DebugClientDataControler` (aucun appel réseau, toutes les vérifications désactivées) pour les tests.
 
 Le framework Sing n'effectue **jamais** d'appel HTTP directement mais utilise le paramètre `dataControler` fourni au contructeur de `dataRegistry` pour cela.
 
@@ -43,7 +59,7 @@ Toute utilisation du modèle **nécessite** un accès à l'instance du modèle c
 L'approche préconisée est de définir un `InheritedWidget` :
 ```dart
 class AppModel extends InheritedWidget {
-  static OrderHub$Registry of(BuildContext context) {
+  static OrderHubClientRegistry of(BuildContext context) {
     final widget = context.dependOnInheritedWidgetOfExactType<AppModel>();
     if (widget == null) {
       throw Exception("No AppModel found in context");
@@ -53,7 +69,7 @@ class AppModel extends InheritedWidget {
 
   AppModel({super.key, required this.dataRegistry, required super.child});
 
-  final OrderHub$Registry dataRegistry;
+  final OrderHubClientRegistry dataRegistry;
 
   @override
   bool updateShouldNotify(AppModel oldWidget) =>

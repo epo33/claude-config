@@ -225,9 +225,9 @@ class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
     .withLib("Billing address");
 
   // Shipping and payment
-  final shippingMethod = EnumStringField<ShippingMethod>()
+  final shippingMethod = EnumField<ShippingMethod>()
     .withLib("Shipping method");
-  final paymentMethod = EnumStringField<PaymentMethod>()
+  final paymentMethod = EnumField<PaymentMethod>()
     .withLib("Payment method");
 
   // Financial
@@ -238,7 +238,7 @@ class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
   final totalAmount = DoubleField().withLib("Total amount");
 
   // Status and tracking
-  final status = EnumStringField<OrderStatus>(
+  final status = EnumField<OrderStatus>(
     defaultValue: OrderStatus.pending,
   ).withLib("Order status");
 
@@ -277,7 +277,7 @@ final f1 = StringField();              // Single letter names
 
 ### ✅ Good: Use Enums for Status Fields
 ```dart
-final status = EnumStringField<OrderStatus>();
+final status = EnumField<OrderStatus>();
 ```
 
 ### ❌ Bad: String-Based Status
@@ -391,11 +391,10 @@ Database: `VARCHAR(64)` allowing to store unique string key values (not auto all
 
 #### Enum
 ```dart
-final status = EnumStringField<OrderStatus>();    // name of enum value is used as database value
-final priority = EnumIntField<PriorityLevel>();   // index of enum value is used as database value
+final status = EnumField<OrderStatus>(defaultValue: .pending);
 ```
 
-Database: `VARCHAR(...)` or `INTEGER`. 
+Database: `VARCHAR(...)`, the key of the enum value being stored.
 
 Define enums as regular Dart enums:
 ```dart
@@ -428,7 +427,8 @@ Database: `CLOB`
 #### Duration
 ```dart
 final processingTime = DurationField(
-  storeAs: StoreDuration.asMinutes,  // or asSeconds, asHours, asDays
+  storeAs: StoreDuration.asMinutes,  // or asDays, asHours, asSeconds, asMilliseconds, asMicroseconds
+  withDecimals: false,
 );
 ```
 
@@ -465,13 +465,13 @@ Implications:
 
 #### @SearchOnlyField
 ```dart
-@SearchOnlyField
-final toForeignCountry = BoolField().nullable; 
+@SearchOnlyField()
+final test = BoolField();
 ```
 
 Implications:
-- `toForeignCountry` **ne définit pas** de colonne dans la table
-- uniquement utilisable dans [les recheches étendues].(SEARCHES.md)
+- `test` **defines no column** in the table
+- `test` is a plain `bool?` parameter of the generated search class and service, read by `$applySearchOnlyFilters` only. See [extended search criteria](SEARCHES.md).
 
 #### Default Values
 ```dart
@@ -525,4 +525,49 @@ mixin CommentFieldMixin on ModelEntity {
   final comment = StringField(maxLength: 1024).nullable();
 }
 ```
+
+## 7. Entity Inheritance
+
+An entity can be the ancestor of other entities sharing its fields. The ancestor extends `ModelAncestorEntity<T>` and names the field telling which descendant a row is (`selectorField`); a descendant extends `ModelDescendantEntity<T>` and states its `ancestorEntity`, its `selectorValue` and whether its rows live in the ancestor's table (`shareStorage`). Example from `coverage/coverage_model/lib/model/pets/animal.dart`:
+
+```dart
+@StdEntityServices()
+@Searchable()
+class AnimalEntity extends ModelAncestorEntity<String> with UuidPrimaryKeyMixin {
+  final kind = StringField(maxLength: 20);
+  final name = StringField(maxLength: 50);
+
+  @override
+  ScalarField<String> get selectorField => kind;
+}
+
+abstract class AnimalDescendant extends ModelDescendantEntity<String> {
+  AnimalDescendant({required String kind, super.shareStorage})
+    : super(ancestorEntity: AnimalEntity(), selectorValue: kind);
+}
+
+@StdEntityServices()
+class CatEntity extends AnimalDescendant {
+  CatEntity() : super(kind: "cat", shareStorage: true);
+  final livesLeft = IntField(defaultValue: 9).nullable();
+}
+```
+
+Inheritance is limited to **two levels**: the builder refuses an entity that is both a `ModelDescendantEntity` and a `ModelAncestorEntity`. The generated phantom class of a descendant implements the one of its ancestor (`Cat implements Entity, Animal`), and its search class extends the ancestor's one (see [searches](SEARCHES.md)).
+
+## 8. Tuples
+
+A tuple describes a typed row shape without storage: fields are declared as on an entity, but no table, no services and no search are generated. It extends `ModelTuple` and **must** state a `tupleKey`, unique across the whole model chain (sub-models included) and distinct from every entity path:
+
+```dart
+class ChildCountTuple extends ModelTuple {
+  @override
+  String get tupleKey => "relations.childCount";
+
+  final parent = ReferenceTo<ParentEntity>();
+  final childCount = IntField();
+}
+```
+
+The builder refuses an empty key or a key already used by an entity or another tuple. Every generated phantom class exposes `static const String tupleKey`: the model key for a tuple (`ChildCount.tupleKey == "relations.childCount"`), the entity path for an entity (`Animal.tupleKey == "pets/animals"`). `DataRegistry.tupleDefByKey` resolves either; the wire form of a row writes this key under `$entity` (see [Data exchange](AUTO_JSON.md)). Tuples are the row type of hand-written services returning computed rows (`DataLoader<ChildCount>`).
 

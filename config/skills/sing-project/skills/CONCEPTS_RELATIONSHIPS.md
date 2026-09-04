@@ -43,7 +43,7 @@ class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
 - `order` field generates FK column in database (unless `declareForeignKey:false` in constructor call)
 - `order` column in `order_line` table is automatically indexed (unless `autoIndex:false` in constructor call)
 - `OrderLine` always has a parent `Order`
-- Type-safe reference: `orderLine.order.value` returns `String` (UUID)
+- Type-safe reference: the field is a `ReferenceField<Order, String>`, a `ScalarField<Reference<Order>>`; `orderLine.order.value` is a `Reference<Order>` and `orderLine.order.primaryKey` the `String` key it wraps
 - Error raised if parent record is deleted (unless `onDelete` is specified in constructor call)
 
 ### 2.2. Cascade Rules
@@ -52,7 +52,7 @@ Control what happens when the parent is deleted:
 
 #### 2.2.1. Cascade Delete
 ```dart
-final order = ReferenceTo<OrderEntity>( onDelete: OnDeleteRule.cascade);
+final order = ReferenceTo<OrderEntity>( onDelete: ReferentialAction.cascade);
 ```
 
 Behavior:
@@ -65,7 +65,7 @@ Behavior:
 #### 2.2.2. Error on Delete
 ```dart
 final product = ReferenceTo<ProductEntity>(
-  onDelete: OnDeleteRule.error,  // Default value
+  onDelete: ReferentialAction.error,  // Default value
 );
 ```
 
@@ -79,7 +79,7 @@ Behavior:
 #### 2.2.3. Set Null on Delete (Soft Delete)
 ```dart
 final promotion = ReferenceTo<PromotionEntity>(
-  onDelete: OnDeleteRule.setNull,
+  onDelete: ReferentialAction.setToNull,
 );
 ```
 
@@ -101,7 +101,7 @@ class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
   final customerName = StringField(maxLength: 100);
   final orderDate = DateTimeField.utc().immutable();
   final totalAmount = DoubleField();
-  final status = EnumStringField<OrderStatus>();
+  final status = EnumField<OrderStatus>();
 }
 
 // model/lib/model/orders/order_line.dart
@@ -110,12 +110,12 @@ class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
 class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
   // FK to Order - cascade delete if order deleted
   final order = ReferenceTo<OrderEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   ).withLib("Parent order");
 
   // FK to Product - error if product deleted
   final product = ReferenceTo<ProductEntity>(
-    onDelete: OnDeleteRule.error,
+    onDelete: ReferentialAction.error,
   ).withLib("Product ordered");
 
   // Line details
@@ -125,7 +125,7 @@ class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
 
   // Optional discount
   final discountApplied = ReferenceTo<PromotionEntity>(
-    onDelete: OnDeleteRule.setNull,
+    onDelete: ReferentialAction.setToNull,
   ).nullable().withLib("Discount applied");
 
   // Ensure valid references
@@ -151,11 +151,11 @@ Use an **association entity** to connect two entities with optional attributes.
 class ProductCategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
   // Foreign keys
   final product = ReferenceTo<ProductEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   ).primaryKey();
 
   final category = ReferenceTo<CategoryEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   ).primaryKey();
 
 }
@@ -165,14 +165,9 @@ class ProductCategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
 ```dart
 // Get all categories for a product in a client application
 final productCategories = await $ProductCategory.services(dataRegistry)
-    .search( refProduct: Search.equal(productUuid) )
-    .resolve( (fields) =>[ fields.category])
+    .search(refToProduct: Search.equal(productUuid))
+    .resolve((fields) => [fields.category])
     .listValues();
-
-// Get category names
-final categoryNames = productCategories
-    .map((pc) => pc.category.dataValues.name)
-    .toList();
 ```
 
 ### 3.2. Option 2: Association with Attributes
@@ -186,11 +181,11 @@ final categoryNames = productCategories
 class ProductWarehouseEntity extends ModelEntity with UuidPrimaryKeyMixin {
   // Foreign keys
   final product = ReferenceTo<ProductEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   );
 
   final warehouse = ReferenceTo<WarehouseEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   );
 
   // Association attributes
@@ -223,36 +218,47 @@ By default, child entities have FK to parent. How do you query the parent's chil
 // How to find all OrderLines for an Order?
 ```
 
-#### 4.1.2. Solution: SearchOnForeignField
+#### 4.1.2. Solution: Typed Search Parameters
 
-Sing generates helper methods for reverse lookups:
+The generated search of the child entity carries a `refToOrder` parameter on the key value of its `order` field ([see searches](SEARCHES.md)):
 
 ```dart
-// In $Order class (generated):
-static SearchOnForeignField<Order, OrderLine>
-whereOrderLineOrder(OrderLine$Search filters) =>
-    SearchOnForeignField<Order, OrderLine>(
-      fieldName: r'order',
-      filters: filters,
-    );
-```
-
-**Usage**: Find Order's children
-```dart
-// Get all lines for an order
-final lines = await $OrderLine.services(registry)
-    .search(
-      where: (f) => f.order.$equal(orderId),
-    )
-    .toList();
+// Get all lines for an order (client side)
+final lines = await $OrderLine.services(dataRegistry)
+    .search(refToOrder: Search.equal(orderId))
+    .list();
 
 // Or with additional filters
-final lines = await $OrderLine.services(registry)
-    .loadSearch(
-      where: (f) => f.order.$equal(orderId)
-          .$and(f.quantity.$gt(5)),
+final lines = await $OrderLine.services(dataRegistry)
+    .search(
+      refToOrder: Search.equal(orderId),
+      quantity: SearchOnInt(value: 5, type: .greaterThan),
     )
-    .toList();
+    .list();
+```
+
+The other way round, the generated search of `Order` carries a `whereOrderLineOrder` parameter, typed `SearchOnForeignField<E, OrderLine>`, filtering orders on their lines:
+
+```dart
+// Orders having at least one line with quantity > 5
+final orders = await $Order.services(dataRegistry)
+    .search(
+      whereOrderLineOrder: SearchOnForeignField(
+        fieldName: "order",
+        filters: OrderLine$Search(
+          quantity: SearchOnInt(value: 5, type: .greaterThan),
+        ),
+      ),
+    )
+    .list();
+```
+
+Server side, a hand-written query compares a reference field expression with `$pointToKey(key)`, `$pointToRow(row)` or `$pointToReference(ref)`, and reads the stored key as a `ValueExpr` with `$keyValue`:
+
+```dart
+final lines = await $OrderLine.query(callContext)
+    .load(where: (f) => f.order.$pointToKey(orderId))
+    .list();
 ```
 
 ### 4.2. Hierarchical Relationships (Self-References)
@@ -269,12 +275,12 @@ class EmployeeEntity extends ModelEntity with UuidPrimaryKeyMixin {
 
   // Manager is optional (CEO has no manager)
   final manager = ReferenceTo<EmployeeEntity>(
-    onDelete: OnDeleteRule.setNull,
+    onDelete: ReferentialAction.setToNull,
   ).nullable().withLib("Direct manager");
 
   // Department (non-hierarchical)
   final department = ReferenceTo<DepartmentEntity>(
-    onDelete: OnDeleteRule.error,
+    onDelete: ReferentialAction.error,
   );
 }
 ```
@@ -282,25 +288,18 @@ class EmployeeEntity extends ModelEntity with UuidPrimaryKeyMixin {
 **Finding direct reports**:
 ```dart
 // All employees reporting to managerId
-final directReports = await $Employee.services(registry)
-    .loadSearch(
-      where: (f) => f.manager.$equal(managerId),
-    )
-    .toList();
+final directReports = await $Employee.services(dataRegistry)
+    .search(refToManager: Search.equal(managerId))
+    .listValues();
 
 // All employees in manager's chain
-Future<List<Employee>> getSubordinates(String managerId) async {
-  final direct = await $Employee.services(registry)
-      .loadSearch(
-        where: (f) => f.manager.$equal(managerId),
-      )
-      .toList();
-
-  final subordinates = <Employee>[...direct];
+Future<List<DataRowValues<Employee>>> getSubordinates(String managerId) async {
+  final direct = await $Employee.services(dataRegistry)
+      .search(refToManager: Search.equal(managerId))
+      .listValues();
+  final subordinates = [...direct];
   for (final emp in direct) {
-    subordinates.addAll(
-      await getSubordinates(emp.uuid.value),
-    );
+    subordinates.addAll(await getSubordinates(emp.uuid.value));
   }
   return subordinates;
 }
@@ -324,9 +323,9 @@ class PersonEntity extends ModelEntity {
 // GOOD: Clear association entity
 @StdEntityServices()
 class PersonFamilyRelationEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final person1 = ReferenceTo<PersonEntity>(onDelete: OnDeleteRule.cascade);
-  final person2 = ReferenceTo<PersonEntity>(onDelete: OnDeleteRule.cascade);
-  final relationType = EnumStringField<FamilyRelationType>();
+  final person1 = ReferenceTo<PersonEntity>(onDelete: ReferentialAction.cascade);
+  final person2 = ReferenceTo<PersonEntity>(onDelete: ReferentialAction.cascade);
+  final relationType = EnumField<FamilyRelationType>();
 
   @override
   Iterable<ModelIndex> get indices => [
@@ -345,13 +344,13 @@ enum FamilyRelationType {
 
 **Query**:
 ```dart
-// Find all family relations for a person
-final relations = await $PersonFamilyRelation.services(registry)
-    .loadSearch(
-      where: (f) => f.person1.$equal(personId)
-          .$or(f.person2.$equal(personId)),
+// Find all family relations for a person (server side query)
+final relations = await $PersonFamilyRelation.query(callContext)
+    .load(
+      where: (f) =>
+          f.person1.$pointToKey(personId) | f.person2.$pointToKey(personId),
     )
-    .toList();
+    .list();
 ```
 
 ## 6. Best Practices
@@ -362,12 +361,12 @@ final relations = await $PersonFamilyRelation.services(registry)
 class OrderLineEntity extends ModelEntity {
   // Clear that this line belongs to exactly one order
   final order = ReferenceTo<OrderEntity>(
-    onDelete: OnDeleteRule.cascade,
+    onDelete: ReferentialAction.cascade,
   );
 
   // Clear that product is external reference
   final product = ReferenceTo<ProductEntity>(
-    onDelete: OnDeleteRule.error,
+    onDelete: ReferentialAction.error,
   );
 }
 ```
@@ -411,8 +410,8 @@ class ProductCategoryEntity extends ModelEntity {
 ```dart
 class OrderLineEntity extends ModelEntity {
   // These should never change
-  final order = ReferenceTo<OrderEntity>(immutable: true);
-  final product = ReferenceTo<ProductEntity>(immutable: true);
+  final order = ReferenceTo<OrderEntity>().immutable();
+  final product = ReferenceTo<ProductEntity>().immutable();
 }
 ```
 
@@ -426,13 +425,13 @@ final order = ReferenceTo<OrderEntity>();  // Can be changed!
 
 ```dart
 // Child-only entities: cascade
-final order = ReferenceTo<OrderEntity>(onDelete: OnDeleteRule.cascade);
+final order = ReferenceTo<OrderEntity>(onDelete: ReferentialAction.cascade);
 
 // Shared entities: error
-final product = ReferenceTo<ProductEntity>(onDelete: OnDeleteRule.error);
+final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.error);
 
 // Optional references: setNull
-final promotion = ReferenceTo<PromotionEntity>(onDelete: OnDeleteRule.setNull);
+final promotion = ReferenceTo<PromotionEntity>(onDelete: ReferentialAction.setToNull);
 ```
 
 ### 6.8. ❌ Bad: Wrong Cascade Rules
@@ -440,7 +439,7 @@ final promotion = ReferenceTo<PromotionEntity>(onDelete: OnDeleteRule.setNull);
 ```dart
 // CASCADE when product should be protected
 final product = ReferenceTo<ProductEntity>(
-  onDelete: OnDeleteRule.cascade,  // ❌ Oops! Deletes product
+  onDelete: ReferentialAction.cascade,  // ❌ Oops! Deletes product
 );
 ```
 
@@ -452,13 +451,13 @@ final product = ReferenceTo<ProductEntity>(
 class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
   final customerName = StringField(maxLength: 100);
   final orderDate = DateTimeField.utc().immutable();
-  final status = EnumStringField<OrderStatus>();
+  final status = EnumField<OrderStatus>();
 }
 
 @StdEntityServices()
 class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final order = ReferenceTo<OrderEntity>(onDelete: OnDeleteRule.cascade);
-  final product = ReferenceTo<ProductEntity>(onDelete: OnDeleteRule.error);
+  final order = ReferenceTo<OrderEntity>(onDelete: ReferentialAction.cascade);
+  final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.error);
   final quantity = IntField(lowBound: 1);
 
   @override
@@ -481,8 +480,8 @@ class CategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
 
 @StdEntityServices()
 class ProductCategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final product = ReferenceTo<ProductEntity>(onDelete: OnDeleteRule.cascade);
-  final category = ReferenceTo<CategoryEntity>(onDelete: OnDeleteRule.cascade);
+  final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.cascade);
+  final category = ReferenceTo<CategoryEntity>(onDelete: ReferentialAction.cascade);
 
   @override
   Iterable<ModelIndex> get indices => [

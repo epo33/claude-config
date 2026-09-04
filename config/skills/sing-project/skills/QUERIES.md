@@ -46,7 +46,7 @@ where: (fields) => fields.status.$equal(OrderStatus.pending)
 class OrderEntity extends ModelEntity {
   final orderNumber = StringField(maxLength: 20);
   final orderDate = DateTimeField.utc();
-  final status = EnumStringField<OrderStatus>();
+  final status = EnumField<OrderStatus>();
   final totalAmount = DoubleField();
 }
 
@@ -84,7 +84,7 @@ set.setExpr(
   fields.lineCount,
   (order) => $OrderLine.query(callContext).oneValue(
     what: (line) => line.uuid.$count(),
-    where: (line) => line.order.$equalExpr(order.uuid),
+    where: (line) => line.order.$keyValue.$equalExpr(order.uuid),
   ),
 )
 ```
@@ -121,7 +121,7 @@ for (final order in orders) {
 ```dart
 order.status.value = OrderStatus.shipped;  // Dart value assignment
 order.shippedAt.setToNow(callContext);
-await $Order.query(callContext).update([order.$dataRow]).execute();
+await $Order.query(callContext).updateRow(order.$dataRow).execute();
 ```
 
 #### Example Showing Both Usages
@@ -208,11 +208,14 @@ fields.quantity.$greaterThanExpr(fields.minQuantity)
 fields.price.$betweenExpr(fields.minPrice, fields.maxPrice)
 ```
 
-**Special for references:**
+**Null-safe variants** (`nullSafe: true` renders `IS [NOT] DISTINCT FROM`, so a NULL compares as a value):
 ```dart
-fields.customer.$samePk(customerRef)      // Compare with a Reference object
-fields.customer.$differentPk(customerRef)
+fields.notes.$equalExpr(Expression.nullValue(), nullSafe: true)  // NULL matches
+fields.discount.$different(0.0, nullSafe: true)                  // keeps the NULL rows
+fields.parent.$differentExpr(fields.godParent, nullSafe: true)
 ```
+
+**Special for references:** see 2.3.6 (`$pointToReference`, `$pointToKey`, `$keyValue`).
 
 #### 2.3.3. String Operations
 
@@ -275,9 +278,10 @@ fields.delta.$abs                           // Absolute value
 
 **Rounding:**
 ```dart
-fields.price.$round()           // Round to integer
-fields.price.$round(2)          // Round to 2 decimals
-fields.price.$trunc()           // Truncate to integer
+fields.price.$round()                        // Round to integer
+fields.price.$roundTo(2.toExpresssion())     // Round to 2 decimals
+fields.price.$trunc()                        // Truncate to integer
+fields.price.$truncTo(2.toExpresssion())     // Truncate to 2 decimals
 fields.price.$asInt             // Conversion to int
 fields.count.$asDouble          // Conversion to double
 ```
@@ -344,15 +348,34 @@ where: (fields) =>
 
 #### 2.3.6. Reference Operations
 
+A reference field is a `RefFieldExpr<E, PK>`, a `ValueExpr<Reference<E>>`: the `String`, `num` and date extensions do not apply to it. Five predicates compare the stored key to what you hold; each renders `IS NULL` when its argument names no key (a `null`, or a reference without primary key):
 ```dart
-// Compare two reference fields
-fields.assignedTo.$sameReference(fields.createdBy)
-fields.customer.$differentReference(fields.supplier)
+fields.customer.$pointToReference(customerRef)     // Reference<Customer>
+fields.customer.$pointToKey(customerId)            // bare primary key (String here)
+fields.customer.$pointToRow(customerDataRow)       // DataRow<Customer>
+fields.customer.$pointToValues(customer)           // DataRowValues<Customer>
+fields.customer.$pointToFieldValue(order.customer) // FieldValue<Reference<Customer>>
 
-// Compare foreign key with primary key value
-fields.customer.$fkEqual(customerId)
-fields.product.$fkEqualExpr(subqueryExpr)
+// Negation: NOT (customer = key), UNKNOWN on a NULL column
+fields.customer.$pointToReference(customerRef).$not()
 ```
+
+`$keyValue` reads the column as the key it stores (`ValueExpr<PK>`): the comparison operators of the key type then apply, including against a primary key expression.
+```dart
+fields.customer.$keyValue.$equal(customerId)
+fields.customer.$keyValue.$isInList(customerIds)
+line.order.$keyValue.$equalExpr(order.uuid)        // correlation FK = PK
+```
+
+Two reference fields of the same target compare directly; `nullSafe: true` keeps the NULL rows:
+```dart
+fields.assignedTo.$equalExpr(fields.createdBy)
+fields.parent.$differentExpr(fields.godParent, nullSafe: true)
+fields.customer.$equal(customerRef)                // a Reference<Customer>, `=` semantics
+fields.customer.$different(customerRef, nullSafe: true)
+```
+
+Navigating the reference (`fields.customer.name`) joins the target entity (see 3.6).
 
 #### 2.3.7. Boolean Operations
 
@@ -418,15 +441,15 @@ Predicate buildSearchPredicate(
       fields.totalAmount.$greaterOrEqual(filters.minAmount!),
 
     if (filters.customerRef != null)
-      fields.customer.$samePk(filters.customerRef!),
+      fields.customer.$pointToReference(filters.customerRef!),
 
     if (filters.hasLines == true)
       $OrderLine.existsOrderLine(callContext)(
-        where: (line) => line.order.$equalExpr(fields.uuid),
+        where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
       )
     else if (filters.hasLines == false)
       $OrderLine.notExistsOrderLine(callContext)(
-        where: (line) => line.order.$equalExpr(fields.uuid),
+        where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
       ),
   ]);
 }
@@ -539,19 +562,19 @@ final totals = await $Order.query(callContext).values(
 #### 3.2.1. Inserting a Single Row
 
 ```dart
-final order = await $Order.query(callContext).insert([orderDataRow]).exactlyOne();
+final order = await $Order.query(callContext).insertRow(orderDataRow).exactlyOne();
 // Returns the inserted DataRowValues, as the database stored it (defaults applied)
 
 print("Order created: ${order.uuid.value}");
 ```
 
-`insertNewRow` builds the row for you on fresh values and inserts it:
+`insertNewRow` creates a fresh row through the entity definition, hands its `DataRowValues` to the callback and inserts it:
 ```dart
 final order = await $Order
     .query(callContext)
     .insertNewRow(
       (values) => values
-        ..reference.value = "ORD-001"
+        ..orderNumber.value = "ORD-001"
         ..customer.primaryKey = customer.uuid.value,
     )
     .exactlyOne();
@@ -560,12 +583,12 @@ final order = await $Order
 #### 3.2.2. Inserting Multiple Rows
 
 ```dart
-await $OrderLine.query(callContext).insert(lineDataRows).execute();
+await $OrderLine.query(callContext).insertRows(lineDataRows).execute();
 ```
 
 **Get the number of inserted rows:**
 ```dart
-final count = await $OrderLine.query(callContext).insert(lineDataRows).count();
+final count = await $OrderLine.query(callContext).insertRows(lineDataRows).count();
 
 print("$count rows inserted");
 ```
@@ -582,11 +605,11 @@ DataLoader<Order> addOrder({
   return DataLoader<Order>.defered($Order.ofContext(callContext), (expect) async {
     // Business validation
     if (orderLines.isEmpty) {
-      throw AppError("An order must have at least one line");
+      throw AppError("orderWithoutLines");
     }
 
     // Insert order
-    order = await $Order.query(callContext).insert([order.$dataRow]).exactlyOne();
+    order = await $Order.query(callContext).insertRow(order.$dataRow).exactlyOne();
 
     // Link lines to order
     for (final line in orderLines) {
@@ -596,7 +619,7 @@ DataLoader<Order> addOrder({
     // Insert lines
     await $OrderLine
         .query(callContext)
-        .insert(orderLines.map((e) => e.$dataRow))
+        .insertRows(orderLines.map((e) => e.$dataRow))
         .execute();
 
     // Return order with expectations
@@ -614,8 +637,9 @@ DataLoader<Order> addOrder({
 ```dart
 // Copy delivered orders into an OrderArchive entity sharing the same field names
 await $OrderArchive.query(callContext).insertSelect(
-  ($Order.query(callContext).select()
-        ..where((o) => o.status.$equal(OrderStatus.delivered)))
+  $Order
+      .query(callContext)
+      .select(where: (o) => o.status.$equal(OrderStatus.delivered))
       .projectPartial(
         (o) => $OrderArchive.partialProject(
           uuid: o.uuid,
@@ -640,12 +664,12 @@ order.status.value = OrderStatus.shipped;
 order.shippedAt.setToNow(callContext);
 
 // Save (only modified fields are updated, the row located by its primary key)
-await $Order.query(callContext).update([order.$dataRow]).execute();
+await $Order.query(callContext).updateRow(order.$dataRow).execute();
 ```
 
-`update` takes several rows. With `where`, each row is located by a predicate built from its values rather than by its primary key:
+`updateRows` takes several rows. With `where` (on both verbs), each row is located by a predicate built from its values rather than by its primary key:
 ```dart
-await $Order.query(callContext).update(
+await $Order.query(callContext).updateRows(
   rows,
   where: (row, fields) =>
       fields.orderNumber.$equal(Order$Instance(row).orderNumber.value),
@@ -676,7 +700,7 @@ await $Order.query(callContext).updateWhere(
     fields.lineCount,
     (order) => $OrderLine.query(callContext).oneValue(
       what: (line) => line.uuid.$count(),
-      where: (line) => line.order.$equalExpr(order.uuid),
+      where: (line) => line.order.$keyValue.$equalExpr(order.uuid),
     ),
   ),
   where: (fields) => fields.uuid.$equal(orderId),
@@ -690,7 +714,7 @@ await $OrderLine.query(callContext).updateWhere(
     fields.lineTotal,
     (line) => line.quantity.$asDouble * line.unitPrice,
   ),
-  where: (fields) => fields.order.$equal(orderId),
+  where: (fields) => fields.order.$pointToKey(orderId),
 ).execute();
 ```
 
@@ -709,7 +733,7 @@ set.setExpr(
   fields.productCount,
   (category) => $Product.query(callContext).oneValue(
     what: (p) => p.uuid.$count(),
-    where: (p) => p.category.$equalExpr(category.uuid),
+    where: (p) => p.category.$keyValue.$equalExpr(category.uuid),
   ),
 )
 
@@ -730,14 +754,18 @@ set.increment(fields.retryCount, 1)
 
 #### 3.3.5. UPDATE from a SELECT
 
-`updateSelect` assigns columns from a select correlated to the row being updated: the `source` callback receives the order, whose `subquery<S>(def)` opens a select able to reference `order.fields`. The select must yield one row per updated row.
+`updateSelect` assigns columns from a select correlated to the row being updated: the `source` callback receives the order, whose `subquery<S>(def, where:)` opens a select able to reference `order.fields`. The select must yield one row per updated row.
 ```dart
 // Fill the missing shipping address from the customer's address
 await $Order.query(callContext).updateSelect(
-  source: (order) =>
-      (order.subquery<Customer>($Customer.ofContext(callContext))
-            ..where((c) => c.uuid.$equalExpr(order.fields.customer)))
-          .projectPartial((c) => $Order.partialProject(shippingAddress: c.address)),
+  source: (order) => order
+      .subquery<Customer>(
+        $Customer.ofContext(callContext),
+        where: (c) => c.uuid.$equalExpr(order.fields.customer.$keyValue),
+      )
+      .projectPartial(
+        (c) => $Order.partialProject(shippingAddress: c.address.$keyValue),
+      ),
   where: (o) => o.shippingAddress.$isNull,
 ).execute();
 ```
@@ -770,9 +798,10 @@ print("$count old orders deleted");
 ```
 `count()` deletes without reading the rows unless a change listener needs them; `listValues()` hands the deleted rows back. `delete(where:)` is refused on an entity with change listeners unless `ignoreListeners: true`; `deleteKey(s)`/`deleteRef(s)` always run the listeners.
 
-**Important:** `OnDeleteRule` rules defined in the model apply:
+**Important:** `ReferentialAction` rules defined in the model apply:
 - `cascade`: cascading deletion of children
-- `setNull`: foreign keys set to NULL
+- `setToNull`: foreign keys set to NULL
+- `setDefault`: foreign keys set to their default value
 - `error`: exception if children exist
 
 ### 3.5. UPSERT Queries
@@ -780,7 +809,8 @@ print("$count old orders deleted");
 **Insert or Update based on primary key existence:**
 
 ```dart
-final order = await $Order.query(callContext).upsert([orderDataRow]).exactlyOne();
+final order = await $Order.query(callContext).upsertRow(orderDataRow).exactlyOne();
+await $Order.query(callContext).upsertRows(orderDataRows).execute();
 ```
 
 **Behavior:**
@@ -789,9 +819,9 @@ final order = await $Order.query(callContext).upsert([orderDataRow]).exactlyOne(
 
 **Use case:** Data synchronization where you don't know if the record exists.
 
-**Upsert on a predicate** (`on`): the stored row is the one matching a predicate built from the row's values, instead of the primary key. On a single table this is a `MERGE` (PostgreSQL 15+); the predicate must match at most one row.
+**Upsert on a predicate** (`on`, on both verbs): the stored row is the one matching a predicate built from the row's values rather than the primary key. On a single table this is a `MERGE` (PostgreSQL 15+); the predicate must match at most one row.
 ```dart
-await $Order.query(callContext).upsert(
+await $Order.query(callContext).upsertRows(
   rows,
   on: (row, stored) =>
       stored.orderNumber.$equal(Order$Instance(row).orderNumber.value),
@@ -844,7 +874,7 @@ These methods are in the generated `$Entity` class and shortcut `$Entity.query(c
 final orders = await $Order.query(callContext).load(
   where: (fields) => $OrderLine.existsOrderLine(callContext)(
     where: (line) =>
-        line.order.$equalExpr(fields.uuid) & line.quantity.$greaterThan(10),
+        line.order.$keyValue.$equalExpr(fields.uuid) & line.quantity.$greaterThan(10),
   ),
 ).listValues();
 ```
@@ -855,7 +885,7 @@ final orders = await $Order.query(callContext).load(
 // Orders without lines
 final ordersWithoutLines = await $Order.query(callContext).load(
   where: (fields) => $OrderLine.notExistsOrderLine(callContext)(
-    where: (line) => line.order.$equalExpr(fields.uuid),
+    where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
   ),
 ).listValues();
 ```
@@ -867,10 +897,10 @@ final ordersWithoutLines = await $Order.query(callContext).load(
 final products = await $Product.query(callContext).load(
   where: (fields) => $OrderLine.existsOrderLine(callContext)(
     where: (line) =>
-        line.product.$equalExpr(fields.uuid) &
+        line.product.$keyValue.$equalExpr(fields.uuid) &
         $Order.existsOrder(callContext)(
           where: (order) =>
-              order.uuid.$equalExpr(line.order) &
+              order.uuid.$equalExpr(line.order.$keyValue) &
               order.status.$equal(OrderStatus.pending),
         ),
   ),
@@ -883,7 +913,7 @@ final products = await $Product.query(callContext).load(
 final products = await $Product.query(callContext).load(
   where: (fields) => $OrderLine.existsOrderLine(callContext)(
     where: (line) =>
-        line.product.$equalExpr(fields.uuid) &
+        line.product.$keyValue.$equalExpr(fields.uuid) &
         line.order.status.$equal(OrderStatus.pending),
   ),
 ).listValues();
@@ -896,12 +926,12 @@ final products = await $Product.query(callContext).load(
 
 // 1. With NOT EXISTS
 $OrderLine.notExistsOrderLine(callContext)(
-  where: (line) => line.order.$equalExpr(fields.uuid),
+  where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
 )
 
 // 2. With predicate negation
 $OrderLine.existsOrderLine(callContext)(
-  where: (line) => line.order.$equalExpr(fields.uuid),
+  where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
 ).$not()
 ```
 
@@ -915,7 +945,7 @@ final orders = await $Order.query(callContext).load(
   where: (fields) => fields.totalAmount.$greaterThanExpr(
     $OrderLine.query(callContext).oneValue(
       what: (line) => (line.quantity.$asDouble * line.unitPrice).$sum(),
-      where: (line) => line.order.$equalExpr(fields.uuid),
+      where: (line) => line.order.$keyValue.$equalExpr(fields.uuid),
     ),
   ),
 ).listValues();
@@ -948,7 +978,7 @@ if (totalReceived != null) {
 ```dart
 // Customers with more than 5 orders
 final busy = $Order.query(callContext).oneValue(
-  what: (o) => o.customer,
+  what: (o) => o.customer.$keyValue,
   groupBy: (o) => [o.customer],
   having: (o) => o.uuid.$count().$greaterThan(5),
 );
@@ -992,16 +1022,17 @@ what: (order) => order.totalAmount.$stdDev()
 
 ## 5. Engine Builder (select)
 
-`query.select()` returns a `TupleSelect<E>`: the select of the entity's rows, ready to run, on which joins, filters, ordering, grouping, projections, CTEs and compounds accumulate. The façade verbs of section 3 are built on it; use it directly when a verb is not enough. Mutators (`where`, `orderBy`, `distinct`, `distinctOn`, `limit`, `offset`, `having`) return `void`: chain them with the cascade operator `..`. Transitions that produce another object (`groupBy`, `groupingSets`, `project`, `projectPartial`, `asCte`, `union`...) return it.
+`query.select()` returns a `TupleSelect<E>`: the select of the entity's rows, ready to run, on which joins, filters, ordering, grouping, projections, CTEs and compounds accumulate. The façade verbs of section 3 are built on it; use it directly when a verb is not enough. The clause methods (`where`, `orderBy`, `distinct`, `distinctOn`, `limit`, `offset` on `TupleSelect`, `having` on `GroupedSelect`, `orderBy`, `limit`, `offset` on `CompoundSelect`) mutate the select and return it, so calls chain with `.`. Transitions that produce another object (`groupBy`, `groupingSets`, `project`, `projectPartial`, `asCte`, `union`...) return that object. `select(where:, orderBy:, limit:, offset:)` applies these clauses at once.
 
 ### 5.1. Filters, Sorts, Fetch
 
 ```dart
-final select = $Order.query(callContext).select()
-  ..where((o) => o.status.$equal(OrderStatus.pending))
-  ..where((o) => o.totalAmount.$greaterThan(100.0))   // AND
-  ..orderBy((o) => [o.orderDate.$desc])
-  ..limit(20);
+final select = $Order
+    .query(callContext)
+    .select(where: (o) => o.status.$equal(OrderStatus.pending))
+    .where((o) => o.totalAmount.$greaterThan(100.0))   // AND
+    .orderBy((o) => [o.orderDate.$desc])
+    .limit(20);
 
 final orders = await select.fetch(callContext).listValues();  // DataLoader<Order>
 final count = await select.count(callContext);               // COUNT(*)
@@ -1017,12 +1048,12 @@ print(select.toSql());                                        // the SQL text
 final orders = $Order.query(callContext).select();
 final lines = orders.join<OrderLine>(
   $OrderLine.ofContext(callContext),
-  on: (line) => line.order.$fkEqualExpr(orders.fields.uuid),
+  on: (line) => line.order.$keyValue.$equalExpr(orders.fields.uuid),
   outer: true,
 );
-orders..where((o) => lines.quantity.$greaterThan(10));
+orders.where((o) => lines.quantity.$greaterThan(10));
 ```
-`select.fields` are the expressions of the root entity; `$fkEqualExpr` compares a reference field to a primary key expression. Reference navigation (`o.customer.name`) still joins automatically.
+`select.fields` are the expressions of the root entity; `$keyValue` reads a reference field as the key it stores, comparable to a primary key expression. Reference navigation (`o.customer.name`) still joins automatically.
 
 ### 5.3. GROUP BY and Projections
 
@@ -1039,16 +1070,17 @@ class CustomerStatTuple extends ModelTuple {
   final total = DoubleField();
 }
 ```
-Sing generates `$CustomerStat.project(...)` (every field required, nullable ones optional) and `$CustomerStat.partialProject(...)` (every field optional) with one `ValueExpr` parameter per field. A projected reference takes the primary key expression of its target.
+Sing generates `$CustomerStat.project(...)` (every field required, nullable ones optional) and `$CustomerStat.partialProject(...)` (every field optional) with one `ValueExpr` parameter per field. A reference parameter is typed on its key (`ValueExpr<String>` for a `String` key): pass `$keyValue` of a reference field, or a primary key expression.
 ```dart
 DataLoader<CustomerStat> customerStats({required CallContext callContext}) {
   final orders = $Order.query(callContext).select();
-  final grouped = orders.groupBy((o) => [o.customer])
-    ..having((o) => o.uuid.$count().$greaterThan(1));
+  final grouped = orders
+      .groupBy((o) => [o.customer])
+      .having((o) => o.uuid.$count().$greaterThan(1));
   return grouped
       .project(
         (o) => $CustomerStat.project(
-          customer: o.customer,
+          customer: o.customer.$keyValue,
           orderCount: o.uuid.$count(),
           total: o.totalAmount.$sum(),
         ),
@@ -1070,14 +1102,16 @@ A select grouped by sets takes no further `groupBy`.
 
 ### 5.4. Subqueries in the Builder
 
-`subquery<S>(def)` opens a select correlated to the current one; end it with `exists()`, `notExists()` or `oneValue((s) => expr)`:
+`subquery<S>(def, where:)` opens a select correlated to the current one; end it with `exists()`, `notExists()` or `oneValue((s) => expr)`:
 ```dart
 final orders = $Order.query(callContext).select();
 final withBigLine = orders
-    .subquery<OrderLine>($OrderLine.ofContext(callContext))
-  ..where((line) => line.order.$equalExpr(orders.fields.uuid))
-  ..where((line) => line.quantity.$greaterThan(10));
-orders..where((_) => withBigLine.exists());
+    .subquery<OrderLine>(
+      $OrderLine.ofContext(callContext),
+      where: (line) => line.order.$keyValue.$equalExpr(orders.fields.uuid),
+    )
+    .where((line) => line.quantity.$greaterThan(10));
+orders.where((_) => withBigLine.exists());
 ```
 The generated `existsX`/`notExistsX`/`valueFromX` of section 4 are usable inside `where` as well.
 
@@ -1090,16 +1124,16 @@ final stats = customerStatsSelect(callContext).asCte(name: "stats");
 
 // Select on the CTE
 final big = TupleSelect<CustomerStat>.onCte(stats)
-  ..where((s) => s.total.$greaterThan(10000.0));
+    .where((s) => s.total.$greaterThan(10000.0));
 final rows = await big.fetch(callContext).listValues();
 
 // Join the CTE
 final customers = $Customer.query(callContext).select();
 final joined = customers.joinCte<CustomerStat>(
   stats,
-  on: (s) => s.customer.$fkEqualExpr(customers.fields.uuid),
+  on: (s) => s.customer.$keyValue.$equalExpr(customers.fields.uuid),
 );
-customers..where((_) => joined.orderCount.$greaterThan(3));
+customers.where((_) => joined.orderCount.$greaterThan(3));
 ```
 `RecursiveCteSource<P>(roots:, recurse: (self) => ..., all: true)` builds a `WITH RECURSIVE`: `roots` and the select `recurse` builds on `self` share the shape `P`; the recursive branch may neither group nor aggregate.
 
@@ -1107,12 +1141,15 @@ customers..where((_) => joined.orderCount.$greaterThan(3));
 
 Two selects of the same shape combine with `union`, `intersect`, `except` (`all: true` for the `ALL` variants). The `CompoundSelect<P>` takes `orderBy`, `limit`, `offset` on the shape's fields and runs with `fetch(callContext)` or `count(callContext)`.
 ```dart
-final pending = $Order.query(callContext).select()
-  ..where((o) => o.status.$equal(OrderStatus.pending));
-final unpaid = $Order.query(callContext).select()
-  ..where((o) => o.paidAt.$isNull);
-final orders = await (pending.union(unpaid)
-      ..orderBy((o) => [o.orderDate.$desc]))
+final pending = $Order
+    .query(callContext)
+    .select(where: (o) => o.status.$equal(OrderStatus.pending));
+final unpaid = $Order
+    .query(callContext)
+    .select(where: (o) => o.paidAt.$isNull);
+final orders = await pending
+    .union(unpaid)
+    .orderBy((o) => [o.orderDate.$desc])
     .fetch(callContext)
     .listValues();
 ```
@@ -1240,14 +1277,16 @@ final adjustedPrice = fields.priceCategory.$mapExpr({
 
 ```dart
 // Compare FK with a Reference object
-where: (fields) => fields.customer.$samePk(customerRef)
+where: (fields) => fields.customer.$pointToReference(customerRef)
 
-// Compare FK with a primary key value (if PK is String)
-where: (fields) => fields.customer.$equal(customerId)
+// Compare FK with a primary key value
+where: (fields) => fields.customer.$pointToKey(customerId)
+where: (fields) => fields.customer.$keyValue.$isInList(customerIds)
 
 // Compare two reference fields
-where: (fields) => fields.assignedTo.$sameReference(fields.createdBy)
+where: (fields) => fields.assignedTo.$equalExpr(fields.createdBy)
 ```
+The five `$pointToXXX` predicates and `$keyValue` are detailed in 2.3.6.
 
 #### 6.3.2. Navigating References
 
@@ -1269,17 +1308,18 @@ await $Order.query(callContext).updateWhere(
 ).execute();
 ```
 
-**With setExpr (subquery):**
+**From a query (subquery on the key):** `setExpr` on a reference field expects a `ValueExpr<Reference<E>>`, which a scalar subquery on the key (`ValueExpr<String>`) is not, and a SET expression may not navigate a reference. Use `updateSelect` with `partialProject(field: expr.$keyValue)` (see 3.3.5):
 ```dart
-await $Order.query(callContext).updateWhere(
-  set: (fields, set) => set.setExpr(
-    fields.assignedTo,
-    (_) => $User.query(callContext).oneValue(
-      what: (user) => user.uuid,
-      where: (user) => user.name.$equal("DOLL"),
-    ),
-  ),
-  where: (fields) => fields.status.$equal(OrderStatus.pending),
+await $Order.query(callContext).updateSelect(
+  source: (order) => order
+      .subquery<Customer>(
+        $Customer.ofContext(callContext),
+        where: (c) => c.uuid.$equalExpr(order.fields.customer.$keyValue),
+      )
+      .projectPartial(
+        (c) => $Order.partialProject(shippingAddress: c.address.$keyValue),
+      ),
+  where: (o) => o.shippingAddress.$isNull,
 ).execute();
 ```
 
@@ -1326,12 +1366,15 @@ fields.phone.$ifNullThenExpr(
 
 ```dart
 // NULL vs non-NULL references
-fields.manager.$isNull                    // Manager is NULL
-fields.assignedTo.$differentPk(userRef)   // Handles NULL automatically
+fields.manager.$isNull                                  // Manager is NULL
+fields.assignedTo.$pointToReference(null)               // Same: IS NULL
+fields.assignedTo.$pointToReference(userRef).$not()     // NOT (= key): drops the NULL rows
+fields.assignedTo.$different(userRef, nullSafe: true)   // IS DISTINCT FROM: keeps them
 
 // Warning: $different does NOT match NULL
 fields.status.$different(OrderStatus.cancelled)  // Excludes NULL
 // To include NULL:
+fields.status.$different(OrderStatus.cancelled, nullSafe: true)
 fields.status.$different(OrderStatus.cancelled) | fields.status.$isNull
 ```
 
@@ -1398,22 +1441,22 @@ mixin OrderServices on EntityServerServices<Order, String> {
       // Business validations
       // Note that typed AppError exceptions are sent to client applications
       if (order.status.value != OrderStatus.pending) {
-        throw AppError("Only pending orders can be shipped");
+        throw AppError("orderNotPending", {"status": order.status.value.name});
       }
 
       final lineCount = await $OrderLine.query(callContext).count(
-        where: (line) => line.order.$equal(orderId),
+        where: (line) => line.order.$pointToKey(orderId),
       );
 
       if (lineCount == 0) {
-        throw AppError("Cannot ship an order without lines");
+        throw AppError("orderWithoutLines");
       }
 
       // Update
       order.status.value = OrderStatus.shipped;
       order.shippedAt.setToNow(callContext);
 
-      await $Order.query(callContext).update([order.$dataRow]).execute();
+      await $Order.query(callContext).updateRow(order.$dataRow).execute();
 
       return $Order
           .query(callContext)
@@ -1431,12 +1474,12 @@ mixin OrderServices on EntityServerServices<Order, String> {
 ```dart
 await $Entity
   .query(callContext)              // Entry point: Query<E, PK>
-  .{verb}(...)                     // load(where:), loadKey(pk), insert(rows), updateWhere(set:, where:), delete(where:), ...
+  .{verb}(...)                     // load(where:), loadKey(pk), insertRows(rows), updateWhere(set:, where:), delete(where:), ...
   .{expected}                      // [fields, resolve, sort](DATA_CLASSES.md)
   .{execution}                     // listValues, exactlyOne, execute, count, etc.
 
 $Entity.query(callContext).select() // Engine builder: TupleSelect<E>
-  ..where(...)..orderBy(...)        // then join, groupBy, project, asCte, union...
+  .where(...).orderBy(...)          // then join, groupBy, project, asCte, union...
   .fetch(callContext)               // DataLoader<E>
 ```
 
@@ -1448,17 +1491,18 @@ $Entity.query(callContext).select() // Engine builder: TupleSelect<E>
 | LOAD by key    | `.loadKey(pk).exactlyOne()` / `.loadRef(ref).one()`     | `DataRowValues<E>`       |
 | COUNT          | `.count(where: ...)`                                    | `int`                    |
 | RAW COLUMNS    | `.values(columns: ..., where: ...)`                     | `List<List>`             |
-| INSERT         | `.insert([dataRow]).exactlyOne()`                       | `DataRowValues<E>`       |
+| INSERT         | `.insertRow(dataRow).exactlyOne()` / `.insertRows(rows).execute()` | `DataRowValues<E>` / `void` |
+| INSERT new     | `.insertNewRow((values) => ...).exactlyOne()`           | `DataRowValues<E>`       |
 | INSERT SELECT  | `.insertSelect(select.projectPartial(...)).execute()`   | `void`                   |
-| UPDATE rows    | `.update([dataRow]).execute()`                          | `void`                   |
-| UPDATE where   | `.updateWhere(set: (set, f) => ..., where: ...).count()`| `int`                    |
+| UPDATE rows    | `.updateRow(dataRow).execute()` / `.updateRows(rows).execute()` | `void`           |
+| UPDATE where   | `.updateWhere(set: (fields, set) => ..., where: ...).count()`| `int`               |
 | UPDATE SELECT  | `.updateSelect(source: (order) => ..., where: ...)`     | `DataLoader<E>`          |
 | DELETE         | `.deleteKey(pk).execute()` / `.delete(where: ...).count()` | `void` / `int`        |
-| UPSERT         | `.upsert([dataRow]).exactlyOne()`                       | `DataRowValues<E>`       |
-| UPSERT on      | `.upsert(rows, on: (row, stored) => ...).execute()`     | `void`                   |
+| UPSERT         | `.upsertRow(dataRow).exactlyOne()` / `.upsertRows(rows).execute()` | `DataRowValues<E>` / `void` |
+| UPSERT on      | `.upsertRows(rows, on: (row, stored) => ...).execute()` | `void`                   |
 | EXISTS         | `$Entity.existsEntity(ctx)(where: ...)`                 | `Predicate`              |
 | SCALAR         | `.oneValue(what: ..., where: ...)`                      | `QueryExpr<T>`           |
-| BUILDER        | `.select()..where(...)` then `.fetch(ctx)`              | `TupleSelect<E>`         |
+| BUILDER        | `.select(where: ...).orderBy(...)` then `.fetch(ctx)`   | `TupleSelect<E>`         |
 | GROUP          | `.select().groupBy(...).project((f) => $T.project(...))`| `ProjectedSelect<E, T>`  |
 
 ### 8.3. Expressions vs Values
@@ -1481,7 +1525,10 @@ $Entity.query(callContext).select() // Engine builder: TupleSelect<E>
 - **`$cast<T>()`**: Forces expression type
 - **`.getValue()`**: Executes a scalar subquery and returns the value
 - **`$asc` / `$desc`**: Turn an expression into a `SortSpec` (`orderBy`)
-- **`..`**: Cascade on the builder mutators (`where`, `orderBy`, `limit`, `having` return `void`)
+- **`$keyValue`**: Reads a reference field as its stored key (`ValueExpr<PK>`)
+- **`$pointToXXX`**: Compares a reference field to a row, values, reference, key or field value
+- **`nullSafe: true`**: `IS [NOT] DISTINCT FROM` on `$equal`, `$different` and their `Expr` variants
+- **`.where(...).orderBy(...)`**: The builder clause methods return their select
 
 ### 8.5. Security Checklist
 
