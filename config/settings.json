@@ -17,6 +17,10 @@
           {
             "type": "command",
             "command": "bash ~/.claude/scripts/guard-destructive.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash ~/.claude/scripts/guard-commit-message.sh"
           }
         ]
       }
