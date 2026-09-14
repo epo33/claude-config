@@ -9,7 +9,8 @@ From these definitions, the Sing code generation process (sing_builder) produces
 - In server applications
 - In client applications
 
-To launch the build, use the command `dart run model/build/sing_build.dart`.
+To launch the build, run `dart run sing_builder:sing_emit` from the model
+package. See [generated code](GENERATED_CODE.md).
 
 ## 1. Define a Namespace
 
@@ -481,6 +482,36 @@ final quantity = IntField(defaultValue: 0);
 Effects:
 - Database assigns on insert if not provided
 - Client-side validation uses defaults
+
+### How a Field May Be Written
+
+The builder reads the model source; it never runs it. A field is therefore read
+from the expression it is written as, and only five shapes are read:
+
+- a constructor call, named or not: `StringField(maxLength: 50)`,
+  `DateTimeField.utc()`;
+- a modifier applied to one of these: `StringField().nullable()`. Only the
+  modifiers Sing declares are read;
+- a call to a factory whose body is a single expression, which the builder
+  walks into;
+- an argument bound to a parameter, its default value included;
+- a conditional whose condition is a parameter bound to a boolean literal.
+
+```dart
+// Read: a constructor, then two modifiers.
+final email = StringField(maxLength: 120).nullable().immutable();
+
+// Read: a factory whose body is one expression.
+Field<String> shortName() => StringField(maxLength: 20);
+final label = shortName();
+
+// Not read: the builder cannot tell what the list holds at this point.
+final tags = _fieldsOf(["a", "b"]).first;
+```
+
+Anything else stops the generation with a message naming the file and the
+line: `Field error at order.dart:31: ...`. A field the builder cannot read is a
+field it would describe wrongly, so it refuses rather than guesses.
 
 ### Field Naming and SQL Mapping
 

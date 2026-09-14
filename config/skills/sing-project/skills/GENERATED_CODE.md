@@ -1,15 +1,46 @@
 # Generated Code by `sing_builder`
 
 ## 1. Model Reconstruction
-Code generation (or *model reconstruction*) is performed by executing `dart run build/sing_build.dart` from the `model/` package (the script calls `produceSingCode(model: createOrderHubModel(), pathToSing: ...)` from `sing_builder/commands.dart`). This command will:
-1. Instantiate the model description (`createOrderHubModel()` in `model/lib/model/model.dart`, returning a `Model`)
-2. Analyze the definitions (root namespace or children recursively, entities, decorators, sub-models, versions, etc.)
-3. Generate all model source files (in folders `model/lib/sing`, `common/lib/src/sing` and `model_sing_client/lib/src`), the previous content being kept aside in a sibling `_save` folder
-4. Run `dart format` on these three folders
-5. Run `dart analyze` on them to check that every produced symbol resolves
-6. In case of error, the previous content is restored and the rejected code is moved to a sibling folder suffixed `.incorrect` (e.g. `model/lib/sing.incorrect`)
 
-With a model defining a hundred entities, the operation takes less than a minute and generates approximately 100kLOC and around 300 files.
+Code generation (or *model reconstruction*) is performed by running
+`dart run sing_builder:sing_emit <model package directory>`. The directory
+defaults to the current one, so `dart run sing_builder:sing_emit` from the
+`model/` package emits that model. This command will:
+
+1. Read the model source with the Dart analyzer. The model is never run, so a
+   model that does not compile still gets read, and the generator reports what
+   it could not make sense of.
+2. Render the three sides at once: `model/lib/sing`, `common/lib/src/sing` and
+   `model_sing_client/lib/src`. Each file is formatted as it is rendered.
+3. Run `dart analyze` on each written directory, to check that every produced
+   symbol resolves.
+4. Run `dart fix --apply` then `dart format` on it, which brings the quotes to
+   what the package asks for and drops the imports the emission left unused.
+
+The command answers 0 when the emitted code raises no error and no warning,
+and 65 otherwise.
+
+Two traps:
+
+- **Files are written in place, and nothing is saved aside.** A directory
+  whose analysis raises an error is left exactly as emitted, so that the
+  reading of the failure is not lost. Recover the previous state with git.
+- **A file the emission no longer writes is left on disk.** Renaming an
+  entity or a namespace leaves the file of the old name behind, where it
+  still compiles and still gets exported. Delete the files the run did not
+  write.
+
+Useful options, `-h` lists them all:
+
+- `--no-validate` skips step 3 and 4. It roughly halves the time, and is the
+  way to iterate on a model. Run once without it before committing.
+- `--side` restricts what is emitted to `server`, `common` or `client`.
+- `--sdk` names the Dart SDK. A compiled executable cannot find it on the
+  PATH on its own.
+
+A model reads the generated code of the models it mounts: emit those first, by
+another run. With a model defining a hundred entities, the operation takes less
+than a minute and generates approximately 100kLOC and around 300 files.
 
 ## 2. Generated Files Organization
 
@@ -36,7 +67,9 @@ The generated files are organized as follows (e.g., `Order`):
   - Server-side services in /model/lib/sing
   - Client-side services in /model_sing_client
 - `Order$Search` - Class for typed searches
+- `Order$SearchParams` - Named parameters of the search services of the entity
 - `Order$SearchMixin` - Mixin for search functionalities
+- `Order$Tokens` - Extension on `EntityTokens<Order>`, naming the access tokens of the entity (`$Order.tokens.read`)
 - `Order$Instance` - Alias for DataRowValues<Order>
 - `Order$ReferenceExtension` - Extension on Reference<Order>
 - `EntityFieldList$Order` - Extension on EntityFieldsList<Order> (access to field definitions)

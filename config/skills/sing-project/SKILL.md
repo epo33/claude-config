@@ -46,7 +46,7 @@ Sing follows a **model-first approach**:
 ## 3. Example Project
 
 The **`example/`** directory contains the OrderHub example:
-- `model/` - Order, OrderLine, OrderAuditTrace, Customer, Address and Product entities with relationships (`lib/model/`), generated server code (`lib/sing/`), build script (`build/sing_build.dart`)
+- `model/` - Order, OrderLine, OrderAuditTrace, Customer, Address and Product entities with relationships (`lib/model/`), generated server code (`lib/sing/`)
 - `foundation/` - Independent Sing model package providing the `AuditTraceEntity` base extended by `OrderAuditTraceEntity`; generated and built before `model/`
 - `common/` - Shared enumerations, DTOs and generated common code (`lib/src/sing/`, including the `OrderHubRegistry` interface)
 - `model_sing_client/` - Auto-generated client API
@@ -65,7 +65,7 @@ Use the OrderHub example as reference for implementing similar applications.
 
 - **Always check entity definitions first**: The model is the source of truth
 - **Generated code is sacred**: Don't modify files in `model/lib/sing/`, `common/lib/src/sing` or `model_sing_client/lib` manually - regenerate instead
-- **Regenerate or rebuild code**: execute `dart run build/sing_build.dart` from the model package. [Generated code principles](./skills/GENERATED_CODE.md)
+- **Regenerate or rebuild code**: execute `dart run sing_builder:sing_emit` from the model package. [Generated code principles](./skills/GENERATED_CODE.md)
 - **Use mixins for service composition**: Don't create monolithic service classes
 - **Type safety**: Leverage compile-time checking - avoid `dynamic` and string-based access
 - **Patterns matter**: Follow examples in `example/` for consistency

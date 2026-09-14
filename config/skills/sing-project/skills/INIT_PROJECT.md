@@ -6,13 +6,13 @@
 2. Modify `model/pubspec.yaml` to add a dev dependency on the `sing_builder` package from the Sing framework.
 3. Execute the command `cd model; dart run sing_builder:init PATH_TO_SING` where PATH_TO_SING is the path to the Sing framework sources (`sing_builder/bin/init.dart`, which calls `initModelPackages` with `clientPackagePath: "../model_sing_client"` and `commonPackagePath: "../common"`).
 
+This writes the pubspecs and the entry points of the three packages. It emits no
+code: run `dart run sing_builder:sing_emit` from the model package for that.
+
 ## 2. Result
 
-Files and directories created or modified (`sing_builder/lib/src/commands/init_package.dart`):
+Files and directories created or modified (`sing_builder/lib/analyser/init/init_packages.dart`):
     - model
-      - build
-        - sing_build.dart  # `produceSingCode(model: createModelModel())`: rebuilds the generated code
-        - sing_init.dart   # `initModelPackages(...)`: re-runs this initialization
       - lib
         - model
           - model.dart     # `Model createModelModel() => Model(modelName: 'Model');` the root object of the data model
@@ -39,17 +39,6 @@ Files and directories created or modified (`sing_builder/lib/src/commands/init_p
 [More details on the structure](PROJECT_STRUCTURE.md). [More details on generated code](GENERATED_CODE.md).
 
 **Recommended**
-
-- Add an entry in `launch.json` with data :
-```json
-    {
-        "name": "Build model",
-        "cwd": "model",
-        "request": "launch",
-        "type": "dart",
-        "program": "build/sing_build.dart"
-    },
-```
 
 - Create a file `model/lib/model.dart` exporting the framework, the model definitions and the common package, so that a model file imports a single library (from `example/model/lib/model.dart`):
 ```dart
