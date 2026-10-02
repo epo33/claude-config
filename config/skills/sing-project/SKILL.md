@@ -46,8 +46,8 @@ Sing follows a **model-first approach**:
 ## 3. Example Project
 
 The **`example/`** directory contains the OrderHub example:
-- `model/` - Order, OrderLine, OrderAuditTrace, Customer, Address and Product entities with relationships (`lib/model/`), generated server code (`lib/sing/`), build script (`build/sing_build.dart`)
-- `foundation/` - Independent Sing model package providing the `AuditTraceEntity` base extended by `OrderAuditTraceEntity`; generated and built before `model/`
+- `model/` - Order, OrderLine, OrderAuditTrace, Customer, Address and Product entities with relationships (`lib/model/`), generated server code (`lib/sing/`)
+- `foundation/` - Plain Dart package `model` depends on, providing the hand-written `AuditTraceEntity` base extended by `OrderAuditTraceEntity`; not a Sing model, nothing is generated for it
 - `common/` - Shared enumerations, DTOs and generated common code (`lib/src/sing/`, including the `OrderHubRegistry` interface)
 - `model_sing_client/` - Auto-generated client API
 - `orderhub_server/` - Server package placeholder
@@ -56,7 +56,7 @@ This example demonstrates:
 - Multi-namespace model design
 - One-to-Many relationships with cascade deletion
 - Custom service implementation (`*.services.dart` files next to entities)
-- Cross-package model dependency (`foundation` → `model`)
+- Entity base shared across packages (`foundation` → `model`)
 - Server-client separation
 
 Use the OrderHub example as reference for implementing similar applications.
@@ -65,7 +65,7 @@ Use the OrderHub example as reference for implementing similar applications.
 
 - **Always check entity definitions first**: The model is the source of truth
 - **Generated code is sacred**: Don't modify files in `model/lib/sing/`, `common/lib/src/sing` or `model_sing_client/lib` manually - regenerate instead
-- **Regenerate or rebuild code**: execute `dart run build/sing_build.dart` from the model package. [Generated code principles](./skills/GENERATED_CODE.md)
+- **Regenerate or rebuild code**: execute `dart run sing_builder:sing_emit` from the model package (emits the model and every model it mounts in one pass); projects initialized by `sing_init_socle` run `dart run bin/sing_emit.dart` instead. [Generated code principles](./skills/GENERATED_CODE.md)
 - **Use mixins for service composition**: Don't create monolithic service classes
 - **Type safety**: Leverage compile-time checking - avoid `dynamic` and string-based access
 - **Patterns matter**: Follow examples in `example/` for consistency

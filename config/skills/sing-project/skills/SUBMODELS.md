@@ -33,7 +33,7 @@ class CoverageNameSpace extends CoverageBaseNameSpace { ... }
 - The host root namespace **extends** the sub-model root namespace, so the host inherits the sub-model namespaces and entities.
 - The host model package depends on the sub-model model package (`coverage_model` on `coverage_base`) and the host common package depends on the sub-model model package too (`coverage_common` imports `package:coverage_base/model.dart`).
 - An entity of the host can reference an entity of the sub-model (`ReferenceTo<TopicEntity>()` in `coverage_model/lib/model/notes/tagged_note.dart`).
-- The sub-model's `lib/model.dart` exports its model definitions; its generated `server.dart` re-exports `../model/model.dart` (effect of `isSubModel: true`), so importing the host's `server.dart` gives access to the sub-model definitions.
+- The sub-model's `lib/model.dart` exports its model definitions (`export 'model/model.dart';`). `isSubModel: true` only makes `sing_builder:init` write that file; no generator reads the flag.
 - Entity inheritance is limited to two levels (checked by `sing_builder`).
 
 ### 1.2. Generated registries
@@ -74,7 +74,7 @@ abstract interface class CoverageServerRegistry
 
 `DataRegistryBase(layers:)` (sing_core) receives the layers and:
 
-- keeps the first occurrence of a layer stacked twice (same `uuid`, e.g. two sub-models mounting the same base) and refuses two distinct layers with the same `name`;
+- keeps the first occurrence of a layer stacked twice (same `uuid`, e.g. two sub-models mounting the same base) and refuses two distinct layers with the same `name`, or two distinct layers sharing a `uuid`;
 - takes identity (`uuid`, `version`, `compiledAt`) from the **last** layer (the model's own); `versionChain` joins the `version` of every layer with `-`; `layers` is the deduplicated list;
 - builds `pathInfo` from the last layer's `pathInfo`, with `items` = the model's own items **followed by** the items of every lower layer (**flattened** under the host root);
 - registers each lower layer's root `PathInfo` as a sub-model root (used by the path lookup fallbacks below, and so that `nameSpaces` can build the sub-model root namespace type);
@@ -104,6 +104,33 @@ Sub-models nested in sub-models are handled the same way: every lower layer of t
 ### 3.2. Inherited entities in a namespace
 
 The generated namespace class of the host lists the inherited namespaces and entities: `Coverage.subNameSpaces` includes `dataRegistry.nameSpaces<Topics>()` although `Topics` is declared by `CoverageBase`, and a namespace overriding a sub-model namespace lists the parent entities before its own in its `entities` getter. Walking the namespaces of the registry (`visitModel`, `rootNameSpace`) therefore reaches the whole stack.
+
+### 3.3. Several sub-models and grafts
+
+A model can mount several sub-models side by side: `subModels: [createSocleModel(), createSocleExternalToolsModel()]`, where the second one mounts the Socle too (a diamond). The builder and the registry keep each model once, at its lowest occurrence: layers `[Socle, SocleExternalTools, Host]`. Put the shared base first: the order of `subModels` decides which layer labels a token last.
+
+Every layer needs its own `uuid`: `sing_emit` reads it back from the previous generation, or derives a UUID v5 from the package name (never the nil uuid, which made a second fresh layer vanish). `--uuid` and `--compiled-at` only apply to the top layer.
+
+A namespace of a mounted model is extended **without inheritance** by a graft, declared on a property of the root of the model that brings it (`import "package:sing_model/sing_model.dart"`):
+
+```dart
+class SocleExternalToolsNameSpace extends ModelNameSpace {
+  @GraftedInto(SystemNameSpace)
+  final externalTools = ExternalToolEntity();   // an entity grafted into `system`
+
+  @GraftedInto(SystemNameSpace)
+  final myModule = MyModuleNameSpace();          // a whole namespace grafted into `system`
+
+  final own = OwnNameSpace();                    // not grafted
+}
+```
+
+- The grafted item takes the path, `tupleKey`, schema (`@DbName` of the target chain) and token context of the target: `system/externalTools`, `system.external_tool`, `/system/...` tokens.
+- The non-grafted children of the root of a model mounted side by side (whose root the host root does not extend) are mounted under the host root automatically; no getter to write.
+- The builder refuses a name already taken in the target or under the host root, and a target that is no namespace of a mounted model.
+- The layer publishes `grafts` (`PathGraft(targetPath, pathInfos)`); `DataRegistryBase` places them under their target in `pathInfo`, `visitModel` / `getDbTables` see each item once, and `modelDefinition()` adds them under the target.
+- Limit: the generated classes of the target namespace (`System.entities`, `System$View`) do not list the grafts; reach a grafted entity by `$Entity.of(registry)` or by path.
+- The builder fixtures `sing_builder/test/analyser/fixtures/diamond_*` and `graft_collision`, exercised by `test/analyser/diamond_test.dart`, show both forms.
 
 ## 4. Client side
 

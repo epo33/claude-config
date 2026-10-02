@@ -8,11 +8,8 @@
 
 ## 2. Result
 
-Files and directories created or modified (`sing_builder/lib/src/commands/init_package.dart`):
+Only the pubspecs and the library entry points are written (`sing_builder/lib/analyser/init/init_packages.dart`); code is emitted by `sing_emit`:
     - model
-      - build
-        - sing_build.dart  # `produceSingCode(model: createModelModel())`: rebuilds the generated code
-        - sing_init.dart   # `initModelPackages(...)`: re-runs this initialization
       - lib
         - model
           - model.dart     # `Model createModelModel() => Model(modelName: 'Model');` the root object of the data model
@@ -40,16 +37,7 @@ Files and directories created or modified (`sing_builder/lib/src/commands/init_p
 
 **Recommended**
 
-- Add an entry in `launch.json` with data :
-```json
-    {
-        "name": "Build model",
-        "cwd": "model",
-        "request": "launch",
-        "type": "dart",
-        "program": "build/sing_build.dart"
-    },
-```
+- Generate the code with `dart run sing_builder:sing_emit` from `model/` ([details](GENERATED_CODE.md)).
 
 - Create a file `model/lib/model.dart` exporting the framework, the model definitions and the common package, so that a model file imports a single library (from `example/model/lib/model.dart`):
 ```dart

@@ -8,10 +8,7 @@ A Sing project follows a multi-package structure where the **model** is the sour
 
 ```
 project_root/
-├── model/                           # Model definitions (developer-written),
-│   ├── build/
-│   │   ├── sing_build.dart          # `dart run build/sing_build.dart`: rebuilds the generated code
-│   │   └── sing_init.dart           # Re-runs the package initialization
+├── model/                           # Model definitions (developer-written), `dart run sing_builder:sing_emit` rebuilds the generated code
 │   ├── lib/                         # Library code
 │   │   ├── model/                   # Model definitions (developer-written)
 │   │   │   └── model.dart           # `createXxxModel()` returning the `Model`, root namespace class
@@ -60,9 +57,6 @@ The `model` package contains entity definitions and is the most important for un
 
 ```
 model/
-├── build/
-│   ├── sing_build.dart              # Code generation script
-│   └── sing_init.dart               # Package initialization script
 ├── lib/
 │   ├── model/                       # ← Developer-written model definitions
 │   │   ├── model.dart                       # `createXxxModel()` and the root namespace class. Sub structure exports
@@ -253,7 +247,7 @@ Files in `model/lib/sing/`, `common/lib/src/sing/` and `model_sing_client/lib/sr
 
 If you need to change these, **modify the model and regenerate** (from `model/`):
 ```bash
-dart run build/sing_build.dart
+dart run sing_builder:sing_emit
 ```
 
 ### 6.2. Green Flags: Safe to Edit
@@ -317,7 +311,7 @@ touch model/lib/model/orders/order.dart
 touch model/lib/model/orders/order.services.dart
 
 # 5. Regenerate (from model/)
-dart run build/sing_build.dart
+dart run sing_builder:sing_emit
 
 # Generated code appears in:
 # - model/lib/sing/{root}/orders/order.dart ($Order, _Order$Impl, Order$Services)

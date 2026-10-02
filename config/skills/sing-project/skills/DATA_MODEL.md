@@ -9,7 +9,7 @@ From these definitions, the Sing code generation process (sing_builder) produces
 - In server applications
 - In client applications
 
-To launch the build, use the command `dart run model/build/sing_build.dart`.
+To launch the build, run `dart run sing_builder:sing_emit` from `model/`.
 
 ## 1. Define a Namespace
 

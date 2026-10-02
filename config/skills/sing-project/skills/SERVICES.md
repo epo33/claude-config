@@ -76,11 +76,7 @@ Many services return data as DataLoader, DataRowValues, or DataRow (in decreasin
 
 ## 4. Common Issues Encountered
 
-When an error is detected by `sing_builder`:
-- no source file is modified.
-- `sing.incorrect` directories are created in `model/lib`, `common/lib` and `model_sing_client/lib`
-- these directories contain the code that would have been saved if the checks were not blocking.
-They can sometimes be useful to understand the source of the problem. They can be deleted without issue.
+When `sing_emit` refuses a declaration (`[error]` diagnostics), no file is written, for any layer of the chain. `--force` writes the emitted files anyway (the run still answers a failure), which can help understand the source of the problem; regenerate without it once fixed.
 
 ### 4.1. Modifying Primary Key Definition
 When modifying the definition of an entity's primary key, the type may change (e.g., `String` to `int`). During entity rebuild, `sing_builder` will detect that the service mixin (e.g., `OrderServices`) is incorrect (e.g., on `EntityServerServices<Order, String>` instead of `EntityServerServices<Order, int>`). Error pattern:

@@ -60,7 +60,7 @@ Use the orderhub example as reference for implementing similar applications.
 
 - **Always check entity definitions first**: The model is the source of truth
 - **Generated code is sacred**: Don't modify files in `model/lib/sing/`, `common/lib/src/sing` or `model_sing_client/lib` manually - regenerate instead
-- **Regenerate or rebuild code**: execute `dart run model/build/sing_build.dart`. [Generated code principles](GENERATED_CODE.md)
+- **Regenerate or rebuild code**: execute `dart run sing_builder:sing_emit` from `model/` (`dart run bin/sing_emit.dart` in projects initialized by `sing_init_socle`). [Generated code principles](GENERATED_CODE.md)
 - **Use mixins for service composition**: Don't create monolithic service classes
 - **Type safety**: Leverage compile-time checking - avoid `dynamic` and string-based access
 - **Patterns matter**: Follow examples in orderhub/ for consistency

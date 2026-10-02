@@ -1,13 +1,14 @@
 # Generated Code by `sing_builder`
 
 ## 1. Model Reconstruction
-Code generation (or *model reconstruction*) is performed by executing `dart run build/sing_build.dart` from the `model/` package (the script calls `produceSingCode(model: createOrderHubModel(), pathToSing: ...)` from `sing_builder/commands.dart`). This command will:
-1. Instantiate the model description (`createOrderHubModel()` in `model/lib/model/model.dart`, returning a `Model`)
-2. Analyze the definitions (root namespace or children recursively, entities, decorators, sub-models, versions, etc.)
-3. Generate all model source files (in folders `model/lib/sing`, `common/lib/src/sing` and `model_sing_client/lib/src`), the previous content being kept aside in a sibling `_save` folder
-4. Run `dart format` on these three folders
-5. Run `dart analyze` on them to check that every produced symbol resolves
-6. In case of error, the previous content is restored and the rejected code is moved to a sibling folder suffixed `.incorrect` (e.g. `model/lib/sing.incorrect`)
+Code generation (or *model reconstruction*) is performed by `sing_emit` (`sing_builder/bin/sing_emit.dart`): `dart run sing_builder:sing_emit [model package directory]`, the directory defaulting to the current one. Projects initialized by `sing_init_socle` run `dart run bin/sing_emit.dart`, which launches a compiled `sing_emit` then writes `.dart_tool/model_definition.json` through `bin/model_definition.dart`. This command will:
+1. Read the model with the Dart analyzer, without executing it (`createOrderHubModel()` in `model/lib/model/model.dart`), together with every model it mounts (`subModels`)
+2. Render each layer from the deepest mounted model up, each layer reading what this run just rendered for the layers below it, never what the disk holds from an earlier run
+3. Stop without writing anything when a declaration is refused (`[error]` diagnostics), unless `--force`
+4. Write the generated sources (in folders `model/lib/sing`, `common/lib/src/sing` and `model_sing_client/lib/src`) of every layer
+5. With `--validate` (default), run analyze and format on the emitted directories and apply the fixes for the lints left
+
+Other options: `--side server|common|client` (default: all three), `--uuid` and `--compiled-at` (read back from the previous generation when left out), `--sdk` (Dart SDK location when it is not on the PATH).
 
 With a model defining a hundred entities, the operation takes less than a minute and generates approximately 100kLOC and around 300 files.
 
