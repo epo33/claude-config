@@ -215,6 +215,25 @@ $Order.services(callContext).search(
 
 `SearchOnForeignField<PK, FK>` names the searched entity (`PK`) and the entity holding the reference (`FK`); `fieldName` is the field of `FK` pointing at `PK`. Its JSON adapter is `SearchOnForeignFieldAdapter<PK, FK>`.
 
+`none: true` keeps the rows **no** row of `FK` matching `filters` points at (`NOT EXISTS`); with empty filters, the rows nothing points at.
+
+A `whereXxx` criterion is only generated in the model owning the searched entity: an upper layer's entity referencing it is unknown there. Every `X$Search` therefore carries `$foreign`, a list where any layer adds its own criteria:
+
+```dart
+// Encounters (lower layer) no Montage (upper layer) points at
+Encounter$Search(
+  $foreign: [
+    SearchOnForeignField<Encounter, Montage>(
+      fieldName: $Identifiers.encounter,
+      filters: const Montage$Search(),
+      none: true,
+    ),
+  ],
+)
+```
+
+A `$foreign` criterion travels with the path of `FK` (`entityPath`), which the server resolves to read it back typed. The server refuses a `fieldName` that does not reference `PK`, and a negation on a `PK` without a single-field primary key. As for a generated criterion, reading `FK` requires its read token, in a search as in a cube.
+
 ## 2. Extended Search Criteria
 
 This section concerns fields decorated with `@SearchOnlyField` in an entity definition. When calling the search service, Sing calls the `$applySearchOnlyFilters` method inherited from `EntityServerServices` which can return predicates to be added to the automatically determined search criteria.
