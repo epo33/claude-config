@@ -94,7 +94,8 @@ async function ensureLaunched() {
       "--disable-gpu-sandbox",
     ],
   });
-  page = await browser.newPage();
+  const [width, height] = (process.env.VIEWPORT || "1280x720").split("x").map(Number);
+  page = await browser.newPage({ viewport: { width, height } });
   page.on("console", msg => consoleLog.push({ type: msg.type(), text: msg.text() }));
   page.on("pageerror", err => consoleLog.push({ type: "pageerror", text: err.message }));
   page.on("crash", () => consoleLog.push({ type: "crash", text: "page crashed" }));
@@ -132,6 +133,17 @@ const COMMANDS = {
     await page.screenshot({ path: f });
     fs.copyFileSync(f, path.join(SHOT_DIR, "screenshot.png"));
     console.log("screenshot:", f);
+  },
+
+  async burst(args) {
+    if (!page) return console.log("ERROR: nav first");
+    const [name, count, intervalMs] = args.split(/\s+/);
+    for (let i = 0; i < (Number(count) || 10); i++) {
+      const f = path.join(SHOT_DIR, `${name}-${String(i).padStart(2, "0")}.png`);
+      await page.screenshot({ path: f });
+      console.log("screenshot:", f, `t=${i * (Number(intervalMs) || 250)}ms`);
+      await new Promise(r => setTimeout(r, Number(intervalMs) || 250));
+    }
   },
 
   async "screenshot-element"(sel) {
