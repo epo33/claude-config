@@ -771,6 +771,35 @@ await $Order.query(callContext).updateSelect(
 ```
 Same restrictions as `insertSelect`: no change listeners (unless `ignoreListeners: true`), single storage table.
 
+#### 3.3.6. Optimistic Locking (row version)
+
+Every write that changes a row of a versioned entity increments its `_version` (see [row version](DATA_CLASSES.md#4-row-version)): update by key, `updateWhere`, `updateSelect`, upsert, merge. An insert stores 0. An update with no modified field writes nothing and keeps the version. On an entity spread over several tables, the root table is bumped even when only the descendant's columns change.
+
+The version is **checked only on demand**, row by row:
+```dart
+final order = await $Order.query(callContext).loadKey(orderId).exactlyOne();
+order.status.value = OrderStatus.shipped;
+order.$dataRow.$checkRowVersion = true;
+await $Order.query(callContext).updateRow(order.$dataRow).execute();
+```
+The update then adds `AND _version = <read version>`. When no row is written, a second read tells why and raises an `AppError`, rolling the transaction back (the whole batch of an `updateRows`):
+- `DataErrorCodes.codeRowVersionConflict` (`sing.errors.rowVersionConflict`): the row was modified since it was read;
+- `DataErrorCodes.codeRowDeleted` (`sing.errors.rowDeleted`): the row was deleted since.
+
+Both carry `entity` and `key` as parameters. A row asking for the check without a read version, or on an entity that is not versioned, is refused with an `ArgumentError`.
+
+Rules:
+- `updateWhere`, `updateSelect`, `updateRows(where:)` and upserts of unchecked rows increment without checking;
+- an upsert of a row asking for the check and carrying a read version goes through the checked update: a row deleted meanwhile raises `rowDeleted` instead of being inserted again. Those rows come back first and fire the update listeners, not the upsert ones;
+- deletes are not checked;
+- `fields.$rowVersion` is the expression of the version in a select or a predicate (on the queried entity, not through a reference).
+
+Client side, the standard services `updateThis`/`updateThose`/`upsertThis`/`upsertThose` copy the returned version into each sent row asking for the check, so a second save of the same row does not conflict with the first:
+```dart
+row.$checkRowVersion = true;
+await services.updateThis(data: row).execute();
+```
+
 ### 3.4. DELETE Queries
 
 #### 3.4.1. Delete by Key/Reference

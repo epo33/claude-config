@@ -230,3 +230,16 @@ final date = order.orderDate.value;            // Fake value
 | `DataRow<E>`       | `.values`       | `DataRowValues<E>` |
 | `DataRowValues<E>` | `.$dataRow`     | `DataRow<E>`       |
 
+## 4. Row Version
+
+A row of a versioned entity (see [row version column](DATA_MODEL.md#row-version-column)) carries its version as metadata, beside its state, not as a field value:
+
+| Member | Role |
+| ------ | ---- |
+| `DataRow.$rowVersion` / `DataRowValues.$rowVersion` | `int?`, the `_version` read with the row; `null` for a row never read (new row, entity not versioned) |
+| `DataRow.$checkRowVersion` | `bool`, set by the caller to have the next update refused when the stored version differs |
+| `DataRow.adoptRowVersion(saved)` | takes the version of the row the server returned after a save |
+
+Every read of a versioned entity returns the version, whatever the fields asked for (`fields(...)`, references resolved, RETURNING of writes). It travels in JSON under `$rowVersion` and `$checkRowVersion`, follows `copyWith` and `inDataPacket`, and is never counted as a change (`hasChange`, `updatedFields`).
+
+`DataRow.metadataKeys` lists every metadata key of the JSON form (`$entity`, `$state`, `$updated`, `$rowVersion`, `$checkRowVersion`): code hashing or comparing `toJson()` must leave them out, a version changing on every write.

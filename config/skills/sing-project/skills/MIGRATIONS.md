@@ -146,6 +146,10 @@ Steps must be **idempotent** (a step can be replayed when the recorded chain is 
 
 Adding a nullable field, an entity, an index: no step needed, the DDL orders cover it.
 
+A non-nullable field with a constant `defaultValue` is added in a single `ADD COLUMN ... NOT NULL DEFAULT <value>` order: PostgreSQL fills the existing rows without rewriting the table. The row version column `_version` of every versioned table (see [row version](DATA_MODEL.md#row-version-column)) is added this way on the first migration after the upgrade of Sing.
+
+An existing column becoming non-nullable with a `defaultValue` gets its NULL values set to the default first (one `UPDATE` per column), then a single `SET NOT NULL` order covers all of them. Without `defaultValue`, the existing NULL values make the migration fail: fill them in a `BeforeMigrationStep`.
+
 ### 4.2. Renaming or removing a field with data to keep
 
 The model only knows the target name: without a step, the DDL orders add the target column and **drop** the old one (a column absent from the model is dropped, a table absent from the model too). Declare a `BeforeMigrationStep` that renames the old column (or copies its data elsewhere): the DDL orders are computed after the `BeforeMigrationStep`s and then see the renamed column as already there (see § 2.1). An `AfterMigrationStep` completes the data once the structures exist.

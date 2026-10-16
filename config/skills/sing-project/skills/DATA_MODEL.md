@@ -493,6 +493,12 @@ final sku → sku
 ```
 If a field is identified with a reserved database identifier (e.g., `where`), the column will be "escaped" (i.e., `where` becomes `where_`).
 
+### Row Version Column
+
+Every entity stored in its own table with a single-field primary key gets a `_version INT4 NOT NULL DEFAULT 0` column, added by Sing without any declaration: it is **not a field** of the entity (absent from `fields`, `modelDefinition`, searches, OpenAPI), so generic code iterating the fields never meets it. Views, abstract entities, `@Storage.notInDatabase` entities and entities without key or with a composite key have none. In an inheritance, the column lives in the root table only: a descendant sharing its ancestor's storage reads and bumps it there, a descendant owning its table reaches it through the join to the ancestor (`ServerEntityDef.rowVersionStorage`, `isVersioned`, `carriesRowVersion`).
+
+A field whose column would be named `_version` is refused when the table is built. The version travels as row metadata: see [DataRow row version](DATA_CLASSES.md#4-row-version) and [optimistic locking](QUERIES.md#336-optimistic-locking-row-version).
+
 ### Common Field Mixins
 
 It is convenient to define mixins that define one or more common fields in the model.
