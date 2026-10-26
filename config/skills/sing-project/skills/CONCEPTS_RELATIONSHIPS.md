@@ -1,492 +1,404 @@
 # Relationships Between Entities
 
-This document explains how to model relationships (one-to-many, many-to-many, and reverse lookups) in Sing.
+This document explains how to link entities with references (foreign keys), how to read and write a reference at runtime, and how to load the rows it points to.
 
-## 1. Relationship Types in Sing
+Related documents: [field declarations](FIELD_TYPES.md#29-references), [searches through references](SEARCHES.md#5-searching-through-references), [reference predicates in queries](QUERY_EXPRESSIONS.md#8-references), [DataRow, DataPacket and FieldValue](DATA_CLASSES.md).
 
-Sing supports three relationship patterns:
+Sources: `sing_model/lib/src/reference.dart` (`ReferenceTo`), `sing_core/lib/src/std/field_def/reference.dart` (`ReferenceField`), `sing_core/lib/src/data_row/reference.dart` (`Reference`), `sing_core/lib/src/data_row/reference_value.dart` and `intfs.dart` (`FieldValueRef`), `sing_server/lib/src/entity.dart` (foreign keys and indexes of a table).
 
-| Pattern                | Implementation       | Use Case           |
-| ---------------------- | -------------------- | ------------------ |
-| **One-to-Many (1:N)**  | FK from "many" side  | Order → OrderLines |
-| **Many-to-Many (N:N)** | Association entity   | Product ↔ Category |
-| **Hierarchical**       | FK to self or parent | Employee → Manager |
+## 1. Declaring a Reference
 
-## 2. One-to-Many Relationships (1:N)
+### 1.1. `ReferenceTo<E>` in the Model
 
-The most common pattern in Sing.
-
-### 2.1. Basic Pattern
-
-**Parent Entity** (has many):
-```dart
-class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final customerName = StringField(maxLength: 100);
-  final totalAmount = DoubleField();
-}
-```
-
-**Child Entity** (belongs to one parent):
-```dart
-class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  // Foreign Key to parent Order
-  final order = ReferenceTo<OrderEntity>();
-
-  // Other fields
-  final product = ReferenceTo<ProductEntity>();
-  final quantity = IntField(lowBound: 1);
-  final linePrice = DoubleField();
-}
-```
-
-**Result**:
-- `order` field generates FK column in database (unless `declareForeignKey:false` in constructor call)
-- `order` column in `order_line` table is automatically indexed (unless `autoIndex:false` in constructor call)
-- `OrderLine` always has a parent `Order`
-- Type-safe reference: the field is a `ReferenceField<Order, String>`, a `ScalarField<Reference<Order>>`; `orderLine.order.value` is a `Reference<Order>` and `orderLine.order.primaryKey` the `String` key it wraps
-- Error raised if parent record is deleted (unless `onDelete` is specified in constructor call)
-
-### 2.2. Cascade Rules
-
-Control what happens when the parent is deleted:
-
-#### 2.2.1. Cascade Delete
-```dart
-final order = ReferenceTo<OrderEntity>( onDelete: ReferentialAction.cascade);
-```
-
-Behavior:
-- Deleting an Order automatically deletes all OrderLines
-- Database enforces via FK constraint
-- Useful for: Child entities that don't exist independently
-
-**When to use**: OrderLine (can't exist without Order)
-
-#### 2.2.2. Error on Delete
-```dart
-final product = ReferenceTo<ProductEntity>(
-  onDelete: ReferentialAction.error,  // Default value
-);
-```
-
-Behavior:
-- Deleting a Product fails if any OrderLine references it
-- Prevents orphaned references
-- Useful for: Entities that should be preserved
-
-**When to use**: Product (should not be deleted if ordered)
-
-#### 2.2.3. Set Null on Delete (Soft Delete)
-```dart
-final promotion = ReferenceTo<PromotionEntity>(
-  onDelete: ReferentialAction.setToNull,
-);
-```
-
-Behavior:
-- Deleting a Promotion sets FK to NULL in referencing records
-- Useful for: Optional relationships that can be orphaned
-- Requires field to be `.nullable()`
-
-**When to use**: Optional related entities
-
-### 2.3. Complete Example: Order with Line Items
+A reference is a field of type `ReferenceTo<XxxEntity>` in the model class. It points to one row of the target entity. From `example/model/lib/model/orders/order_line.dart`:
 
 ```dart
-// model/lib/model/orders/order.dart
-@StdEntityServices()
-@Searchable()
-@Implementor(OrderServices)
-class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final customerName = StringField(maxLength: 100);
-  final orderDate = DateTimeField.utc().immutable();
-  final totalAmount = DoubleField();
-  final status = EnumField<OrderStatus>();
-}
-
-// model/lib/model/orders/order_line.dart
-@StdEntityServices()
+@LoadServices()
 @Searchable()
 class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  // FK to Order - cascade delete if order deleted
-  final order = ReferenceTo<OrderEntity>(
-    onDelete: ReferentialAction.cascade,
-  ).withLib("Parent order");
+  OrderLineEntity();
 
-  // FK to Product - error if product deleted
-  final product = ReferenceTo<ProductEntity>(
-    onDelete: ReferentialAction.error,
-  ).withLib("Product ordered");
+  final order = ReferenceTo<OrderEntity>(onDelete: .cascade);
 
-  // Line details
+  final product = ReferenceTo<ProductEntity>(onDelete: .error);
+
   final quantity = IntField(lowBound: 1);
+
+  final lineIndex = IntField().immutable();
+
   final unitPrice = DoubleField();
-  final lineTotal = DoubleField();
-
-  // Optional discount
-  final discountApplied = ReferenceTo<PromotionEntity>(
-    onDelete: ReferentialAction.setToNull,
-  ).nullable().withLib("Discount applied");
-
-  // Ensure valid references
-  @override
-  Iterable<ModelIndex> get indices => [
-    ModelIndex([order, product], unique: true),  // One line per product per order (Sing dont add an another index on order column but index product column)
-  ];
 }
 ```
 
-## 3. Many-to-Many Relationships (N:N)
+Constructor parameters of `ReferenceTo<E>`:
 
-Use an **association entity** to connect two entities with optional attributes.
+| Parameter           | Default  | Effect                                                                                                         |
+| ------------------- | -------- | -------------------------------------------------------------------------------------------------------------- |
+| `onDelete`          | `.error` | `ON DELETE` rule of the foreign key (section 1.3).                                                             |
+| `declareForeignKey` | `true`   | `false`: the column exists but no foreign key constraint is created.                                           |
+| `autoIndex`         | `true`   | `false`: no automatic index on the column (section 1.2).                                                       |
+| `deferred`          | `false`  | Stored in the model, but has no effect: every foreign key is created `DEFERRABLE INITIALLY DEFERRED`.          |
+| `accessToken`       | none     | Token required to read the field.                                                                              |
 
-### 3.1. Pattern: Product ↔ Category
+Modifiers (each returns a new field): `.nullable()`, `.immutable()`, `.primaryKey()`, `.readOnly()`, `.withDbName("...")`, `.autoIndexed(false)`, and the generic `.withLib("...")`, `.withDescr("...")`, `.serverOnly()`.
 
-**Scenario**: Products can have multiple Categories, Categories contain multiple Products.
+`ReferenceTo<E>.ownKey()` is a special form (section 2.5).
 
-**Option 1: Simple Association (No Extra Attributes)**
+**The target must have a single-field primary key.** A reference to an entity with a composite primary key fails with "Entity X define a composed primary key. It can't be referenced." An entity without primary key cannot be referenced either.
+
+### 1.2. What the Database Gets
+
+For `OrderLine.order`, the `order_line` table gets:
+
+- a column `order`, of the type of the primary key of `Order` (a `uuid` column here), `NOT NULL` unless the field is `.nullable()`;
+- a foreign key to the `order` table with the `ON DELETE` rule of `onDelete`. It is always `DEFERRABLE INITIALLY DEFERRED`: the check runs at commit, so the insert order of rows inside one transaction does not matter;
+- an index on the column.
+
+No foreign key is created when `declareForeignKey: false`, or when the target is a `@ViewEntity()`.
+
+The automatic index is skipped when:
+
+- `autoIndex: false`;
+- the reference field is part of the primary key;
+- an index declared in `getIndicies()` already starts with this column.
 
 ```dart
-// model/lib/model/categories/product_category.dart
-class ProductCategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  // Foreign keys
-  final product = ReferenceTo<ProductEntity>(
-    onDelete: ReferentialAction.cascade,
-  ).primaryKey();
-
-  final category = ReferenceTo<CategoryEntity>(
-    onDelete: ReferentialAction.cascade,
-  ).primaryKey();
-
-}
+@override
+Iterable<ModelIndex> getIndicies() => [
+  // Unique: one line per product in an order.
+  // This index starts with `order`: no extra index on `order`.
+  // `product` still gets its automatic index.
+  ModelIndex([order, product], unique: true),
+];
 ```
 
-**Accessing the relationship**:
-```dart
-// Get all categories for a product in a client application
-final productCategories = await $ProductCategory.services(dataRegistry)
-    .search(refToProduct: Search.equal(productUuid))
-    .resolve((fields) => [fields.category])
-    .listValues();
-```
+The method name is `getIndicies()` (with this spelling), declared on `ModelEntity`.
 
-### 3.2. Option 2: Association with Attributes
+### 1.3. Delete Rules
 
-**Scenario**: Product ↔ Warehouse with quantity in stock.
+`onDelete` takes a `ReferentialAction` (`sing_core/lib/src/db/db_table.dart`):
 
-```dart
-// model/lib/model/inventory/product_warehouse.dart
-@StdEntityServices()
-@Searchable()
-class ProductWarehouseEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  // Foreign keys
-  final product = ReferenceTo<ProductEntity>(
-    onDelete: ReferentialAction.cascade,
-  );
+| Value        | SQL           | Deleting the target row...                                    | Use for                                         |
+| ------------ | ------------- | ------------------------------------------------------------- | ----------------------------------------------- |
+| `.error`     | `RESTRICT`    | fails while a row points to it. Default value.                | Shared data: `OrderLine.product`, `Order.customer`. |
+| `.cascade`   | `CASCADE`     | also deletes the rows that point to it.                       | Rows that only exist inside their parent: `OrderLine.order`. |
+| `.setToNull` | `SET NULL`    | sets the reference to `NULL`.                                 | Optional links. The field **must** be `.nullable()`. |
+| `.setDefault`| `SET DEFAULT` | sets the column default value.                                | Rare.                                           |
 
-  final warehouse = ReferenceTo<WarehouseEntity>(
-    onDelete: ReferentialAction.cascade,
-  );
+The builder does not check that a `.setToNull` reference is nullable. If it is not, the delete fails at runtime on the `NOT NULL` constraint.
 
-  // Association attributes
-  final quantityInStock = IntField(lowBound: 0);
-  final lastStockCheckDate = DateTimeField.utc().nullable();
-  final minStockLevel = IntField(lowBound: 0);
-  final maxStockLevel = IntField(lowBound: 0);
-  final location = StringField(maxLength: 50).nullable();
+Choose the rule from the meaning of the link: `cascade` on a reference to a shared entity (for example `OrderLine.product`) deletes data you want to keep.
 
-  // Constraints
-  @override
-  Iterable<ModelIndex> get indices => [
-    ModelIndex([product, warehouse], unique: true),
-    ModelIndex([warehouse]),  // Find all products in warehouse
-  ];
-}
-```
+### 1.4. What the Generated Code Gets
 
-## 4. Reverse Lookups (Finding Children)
+For `OrderLine.order` (target `Order`, primary key `String`):
 
-By default, child entities have FK to parent. How do you query the parent's children?
+| Generated member                                      | Type                                   | Use                                                         |
+| ----------------------------------------------------- | -------------------------------------- | ----------------------------------------------------------- |
+| `OrderLine$Instance.order` (on `DataRowValues`)       | `FieldValueRef<Order, String>`         | Read or write the reference of a row (section 3.2).          |
+| `fields.order` in `fields`/`resolve`/`sort` builders  | `EntityFieldsChainView<Order>`         | Navigate: `fields.order.customer.name` (section 5).          |
+| `fieldList.order` (`EntityFieldsList`)                | `ReferenceField<Order, String>`        | The field definition, a `ScalarField<Reference<Order>>`.     |
+| `fields.order` in a query `where:`                    | `RefFieldExpr<Order, String>`          | `$pointToKey`, `$keyValue`... ([queries](QUERY_EXPRESSIONS.md#8-references)). |
+| `Order$ReferenceExtension.primaryKey`                 | `String`                               | Typed key of a `Reference<Order>`.                           |
+| `OrderLine$Search.order` / `refToOrder`               | `Order$Search` / `SearchOnField<String>` | Search on the target fields / on the key value.            |
+| `Order$Search.whereOrderLineOrder`                    | `SearchOnForeignField<E, OrderLine>`   | Reverse criterion on the children (section 4.1).             |
 
-### 4.1. Reverse Relationship Pattern
+## 2. Relationship Patterns
 
-#### 4.1.1. Problem
-```dart
-// Child entity has: final order = ReferenceTo<OrderEntity>();
-// But Order entity has no link back to OrderLines!
+### 2.1. One-to-Many
 
-// How to find all OrderLines for an Order?
-```
-
-#### 4.1.2. Solution: Typed Search Parameters
-
-The generated search of the child entity carries a `refToOrder` parameter on the key value of its `order` field ([see searches](SEARCHES.md)):
+The "many" side holds the reference. The "one" side has **no** collection field: there is no `Order.lines`. You reach the children with a search or a query (section 4).
 
 ```dart
-// Get all lines for an order (client side)
-final lines = await $OrderLine.services(dataRegistry)
-    .search(refToOrder: Search.equal(orderId))
-    .list();
-
-// Or with additional filters
-final lines = await $OrderLine.services(dataRegistry)
-    .search(
-      refToOrder: Search.equal(orderId),
-      quantity: SearchOnInt(value: 5, type: .greaterThan),
-    )
-    .list();
-```
-
-The other way round, the generated search of `Order` carries a `whereOrderLineOrder` parameter, typed `SearchOnForeignField<E, OrderLine>`, filtering orders on their lines:
-
-```dart
-// Orders having at least one line with quantity > 5
-final orders = await $Order.services(dataRegistry)
-    .search(
-      whereOrderLineOrder: SearchOnForeignField(
-        fieldName: "order",
-        filters: OrderLine$Search(
-          quantity: SearchOnInt(value: 5, type: .greaterThan),
-        ),
-      ),
-    )
-    .list();
-```
-
-Server side, a hand-written query compares a reference field expression with `$pointToKey(key)`, `$pointToRow(row)` or `$pointToReference(ref)`, and reads the stored key as a `ValueExpr` with `$keyValue`:
-
-```dart
-final lines = await $OrderLine.query(callContext)
-    .load(where: (f) => f.order.$pointToKey(orderId))
-    .list();
-```
-
-### 4.2. Hierarchical Relationships (Self-References)
-
-**Scenario**: Employee → Manager (Manager is also an Employee)
-
-```dart
-// model/lib/model/employees/employee.dart
-@StdEntityServices()
-@Searchable()
-class EmployeeEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final name = StringField(maxLength: 100);
-  final email = StringField(maxLength: 100);
-
-  // Manager is optional (CEO has no manager)
-  final manager = ReferenceTo<EmployeeEntity>(
-    onDelete: ReferentialAction.setToNull,
-  ).nullable().withLib("Direct manager");
-
-  // Department (non-hierarchical)
-  final department = ReferenceTo<DepartmentEntity>(
-    onDelete: ReferentialAction.error,
-  );
-}
-```
-
-**Finding direct reports**:
-```dart
-// All employees reporting to managerId
-final directReports = await $Employee.services(dataRegistry)
-    .search(refToManager: Search.equal(managerId))
-    .listValues();
-
-// All employees in manager's chain
-Future<List<DataRowValues<Employee>>> getSubordinates(String managerId) async {
-  final direct = await $Employee.services(dataRegistry)
-      .search(refToManager: Search.equal(managerId))
-      .listValues();
-  final subordinates = [...direct];
-  for (final emp in direct) {
-    subordinates.addAll(await getSubordinates(emp.uuid.value));
-  }
-  return subordinates;
-}
-```
-
-## 5. Circular References and Avoiding Deadlocks
-
-**Problem**: Entity A references B, Entity B references A.
-
-```dart
-// BAD: Creates circular dependency
-class PersonEntity extends ModelEntity {
-  final spouse = ReferenceTo<PersonEntity>().nullable();
-  final children = ReferenceTo<PersonEntity>().nullable();  // ❌
-}
-```
-
-**Solution**: Use association entity for true N:N
-
-```dart
-// GOOD: Clear association entity
-@StdEntityServices()
-class PersonFamilyRelationEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final person1 = ReferenceTo<PersonEntity>(onDelete: ReferentialAction.cascade);
-  final person2 = ReferenceTo<PersonEntity>(onDelete: ReferentialAction.cascade);
-  final relationType = EnumField<FamilyRelationType>();
-
-  @override
-  Iterable<ModelIndex> get indices => [
-    ModelIndex([person1, person2], unique: true),
-    ModelIndex([person2, person1], unique: true),  // Both directions
-  ];
-}
-
-enum FamilyRelationType {
-  spouse,
-  child,
-  parent,
-  sibling,
-}
-```
-
-**Query**:
-```dart
-// Find all family relations for a person (server side query)
-final relations = await $PersonFamilyRelation.query(callContext)
-    .load(
-      where: (f) =>
-          f.person1.$pointToKey(personId) | f.person2.$pointToKey(personId),
-    )
-    .list();
-```
-
-## 6. Best Practices
-
-### 6.1. ✅ Good: Clear FK Semantics
-
-```dart
-class OrderLineEntity extends ModelEntity {
-  // Clear that this line belongs to exactly one order
-  final order = ReferenceTo<OrderEntity>(
-    onDelete: ReferentialAction.cascade,
-  );
-
-  // Clear that product is external reference
-  final product = ReferenceTo<ProductEntity>(
-    onDelete: ReferentialAction.error,
-  );
-}
-```
-
-### 6.2. ❌ Bad: Ambiguous References
-
-```dart
-class OrderLineEntity extends ModelEntity {
-  final ref1 = ReferenceTo<EntityA>();  // What is this?
-  final ref2 = ReferenceTo<EntityB>();  // Unclear purpose
-}
-```
-
-### 6.3. ✅ Good: Unique Constraints on Association Entities
-
-```dart
-class ProductCategoryEntity extends ModelEntity {
-  final product = ReferenceTo<ProductEntity>();
-  final category = ReferenceTo<CategoryEntity>();
-
-  @override
-  Iterable<ModelIndex> get indices => [
-    ModelIndex([product, category], unique: true),  // One per pair
-  ];
-}
-```
-
-### 6.4. ❌ Bad: Duplicate Associations
-
-```dart
-// Without unique constraint, same product-category could appear multiple times
-class ProductCategoryEntity extends ModelEntity {
-  final product = ReferenceTo<ProductEntity>();
-  final category = ReferenceTo<CategoryEntity>();
-  // No unique constraint!
-}
-```
-
-### 6.5. ✅ Good: Immutable FKs
-
-```dart
-class OrderLineEntity extends ModelEntity {
-  // These should never change
-  final order = ReferenceTo<OrderEntity>().immutable();
-  final product = ReferenceTo<ProductEntity>().immutable();
-}
-```
-
-### 6.6. ❌ Bad: Mutable FKs
-
-```dart
-final order = ReferenceTo<OrderEntity>();  // Can be changed!
-```
-
-### 6.7. ✅ Good: Proper Cascade Rules
-
-```dart
-// Child-only entities: cascade
-final order = ReferenceTo<OrderEntity>(onDelete: ReferentialAction.cascade);
-
-// Shared entities: error
-final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.error);
-
-// Optional references: setNull
-final promotion = ReferenceTo<PromotionEntity>(onDelete: ReferentialAction.setToNull);
-```
-
-### 6.8. ❌ Bad: Wrong Cascade Rules
-
-```dart
-// CASCADE when product should be protected
-final product = ReferenceTo<ProductEntity>(
-  onDelete: ReferentialAction.cascade,  // ❌ Oops! Deletes product
-);
-```
-
-## 7. Example: Complete E-commerce Model
-
-```dart
-// Orders with items
-@StdEntityServices()
-class OrderEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final customerName = StringField(maxLength: 100);
-  final orderDate = DateTimeField.utc().immutable();
-  final status = EnumField<OrderStatus>();
-}
-
-@StdEntityServices()
 class OrderLineEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final order = ReferenceTo<OrderEntity>(onDelete: ReferentialAction.cascade);
-  final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.error);
-  final quantity = IntField(lowBound: 1);
-
-  @override
-  Iterable<ModelIndex> get indices => [
-    ModelIndex([order, product], unique: true),
-  ];
+  final order = ReferenceTo<OrderEntity>(onDelete: .cascade).immutable();
+  final product = ReferenceTo<ProductEntity>(onDelete: .error);
+  // ...
 }
+```
 
-// Products in categories
-@StdEntityServices()
-class ProductEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final name = StringField(maxLength: 100);
-  final price = DoubleField();
-}
+Make the parent reference `.immutable()` when a child never moves to another parent. An immutable field accepts one assignment; a second assignment with a different value throws.
 
-@StdEntityServices()
-class CategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final name = StringField(maxLength: 50);
-}
+### 2.2. Many-to-Many
 
+Use an association entity with two references. Put the link attributes on it.
+
+```dart
+// Plausible OrderHub extension: products in categories.
 @StdEntityServices()
+@Searchable()
 class ProductCategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
-  final product = ReferenceTo<ProductEntity>(onDelete: ReferentialAction.cascade);
-  final category = ReferenceTo<CategoryEntity>(onDelete: ReferentialAction.cascade);
+  ProductCategoryEntity();
+
+  final product = ReferenceTo<ProductEntity>(onDelete: .cascade);
+
+  final category = ReferenceTo<CategoryEntity>(onDelete: .cascade);
+
+  final displayOrder = IntField();
 
   @override
-  Iterable<ModelIndex> get indices => [
+  Iterable<ModelIndex> getIndicies() => [
     ModelIndex([product, category], unique: true),
   ];
 }
 ```
 
+Without the unique index, the same pair can be stored twice.
+
+Alternative: make the two references the composite primary key (`.primaryKey()` on both, no `UuidPrimaryKeyMixin`). The association then has no extra index to declare, but **it cannot be the target of a reference** (composite key).
+
+Reading the categories of a product, client side:
+
+```dart
+final links = await $ProductCategory
+    .services(dataRegistry)
+    .search(refToProduct: Search.equal(productUuid))
+    .resolve((fields) => [fields.category])
+    .listValues();
+final categoryNames = [
+  for (final link in links) link.category.dataRowValues.name.value,
+];
+```
+
+### 2.3. Self-Reference (Hierarchy)
+
+A reference to the entity itself is usually `.nullable()`: a root row has no parent.
+
+```dart
+// Plausible OrderHub extension.
+class CategoryEntity extends ModelEntity with UuidPrimaryKeyMixin {
+  final name = StringField(maxLength: 100);
+
+  final parent = ReferenceTo<CategoryEntity>(onDelete: .setToNull).nullable();
+}
+```
+
+Direct children: `search(refToParent: Search.equal(categoryUuid))`. Roots: `search(refToParent: Search.isNull())`. For a whole subtree, do not loop over client calls: write a server service with a recursive CTE (`RecursiveCteSource`, see [queries](QUERIES.md)).
+
+### 2.4. Mutual References
+
+Entity A may reference B while B references A. Foreign keys are checked at commit, so both rows can be inserted in the same transaction in any order. At least one side should be `.nullable()` so that a row can exist before its partner.
+
+### 2.5. Reference as Primary Key (One-to-One)
+
+A reference marked `.primaryKey()` makes the row an extension of its target: at most one row per target.
+
+```dart
+// Plausible OrderHub extension: one preference row per customer.
+@StdEntityServices()
+@Searchable()
+class CustomerPreferencesEntity extends ModelEntity {
+  final customer = ReferenceTo<CustomerEntity>(onDelete: .cascade).primaryKey();
+
+  final newsletter = BoolField();
+}
+```
+
+The primary key value is then itself a `Reference<Customer>`. Another entity can reference `CustomerPreferences`; its `refTo` search parameter is then typed `SearchOnField<Reference<Customer>>` (see [searches](SEARCHES.md)).
+
+### 2.6. Own-Key Reference: `ReferenceTo<E>.ownKey()`
+
+An own-key reference points to the row of `E` whose primary key **equals the primary key of the current row**. It has no column and no foreign key. Typical use: a computed `@ViewEntity()` keyed by the same uuid. From `example/model/lib/model/orders/order.dart`:
+
+```dart
+// In OrderEntity: OrderSummary is a view keyed by the order uuid.
+final summary = ReferenceTo<OrderSummaryEntity>.ownKey();
+```
+
+At runtime:
+
+- `order.summary.primaryKey` is `order.uuid.value`;
+- assigning it throws a `StateError`;
+- it is not sent in JSON and not stored;
+- it is resolved like any reference: `.resolve((fields) => [fields.summary])` then `order.summary.dataRowValues.lineCount.value`.
+
+See [VIEW_ENTITIES.md](VIEW_ENTITIES.md) for the view side.
+
+## 3. References at Runtime
+
+### 3.1. `Reference<E>`
+
+`Reference<E>` (`sing_core/lib/src/data_row/reference.dart`) identifies one row of `E`:
+
+| Member                 | Meaning                                                                    |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `entity`               | The `EntityDef` of the target.                                             |
+| `pkValue`              | The primary key value, `dynamic`. `null` for a null reference.             |
+| `primaryKey`           | Generated extension (`Customer$ReferenceExtension`): typed `pkValue`.      |
+| `isNull`               | `pkValue == null`.                                                         |
+| `toJson()` / `Reference.fromJson(dataRegistry, json)` | Wire form: `{"$entity": ..., "primaryKey": ...}`. |
+
+Getting a reference:
+
+```dart
+// From a key
+final ref = $Customer.of(dataRegistry).reference(primaryKey: customerUuid);
+
+// From a row
+final ref = customer.$asReference;        // DataRowValues<Customer>
+final ref = customerRow.asReference;      // DataRow<Customer>
+
+// From a reference field
+final ref = order.customer.value;         // Reference<Customer>
+```
+
+Two references are equal when they target the same root entity (ancestors included) and hold the same key. A reference built from a row that has no key yet carries a correlation uuid instead of a key; it is equal only to itself.
+
+### 3.2. Reading and Writing a Reference Field
+
+`order.customer` is a `FieldValueRef<Customer, String>`, a `FieldValue<Reference<Customer>>` with extra members:
+
+```dart
+// Read
+final customerUuid = order.customer.primaryKey;      // String?
+final customerRef = order.customer.value;           // Reference<Customer>
+final noAddress = order.shippingAddress.isNull;     // true when no target
+
+// Write: the most common form
+line.order.primaryKey = order.uuid.value;
+
+// Write: from a reference or a row
+order.customer.value = customer.$asReference;
+order.shippingAddress.primaryKey = null;            // nullable reference only
+```
+
+Writing marks the field as updated, like any field (see [DATA_CLASSES.md](DATA_CLASSES.md)).
+
+The example service `OrderServices.addOrder` (`example/model/lib/model/orders/order.services.dart`) uses this to attach lines to a new order before inserting them:
+
+```dart
+order = await $Order.query(callContext).insertRow(order.$dataRow).exactlyOne();
+for (final line in orderLines) {
+  line.order.primaryKey = order.uuid.value;
+}
+await $OrderLine.query(callContext)
+    .insertRows(orderLines.map((line) => line.$dataRow))
+    .execute();
+```
+
+With `UuidField(autoAllocate: true)`, the uuid exists as soon as the row is created. You can link children to a parent before inserting the parent.
+
+### 3.3. Loading the Referenced Row: `resolve`
+
+A reference field holds only the key. To read fields of the target, ask the `DataLoader` to **resolve** the reference. The target rows come in the same `DataPacket`, in the same call.
+
+```dart
+final orders = await $Order
+    .services(dataRegistry)
+    .search(status: Search.equal(OrderStatus.pending))
+    .resolve((fields) => [
+      fields.customer,              // loads the customer
+      fields.customer.address,      // and the customer's address
+    ])
+    .listValues();
+
+for (final order in orders) {
+  final customer = order.customer.dataRowValues;    // DataRowValues<Customer>
+  final city = customer.address.dataRowValues.city.value;
+}
+```
+
+Members of `FieldValueRef` for resolved rows:
+
+| Member                        | Behavior                                                                                       |
+| ----------------------------- | ---------------------------------------------------------------------------------------------- |
+| `hasDataRow`                  | `true` when the target row is in the packet.                                                   |
+| `dataRowValues` / `dataRow`   | The target row. **Throws** `"Field 'x' has not been resolved."` when `hasDataRow` is false.    |
+| `isMasked`                    | `true` when the server did not load the target on purpose (see below).                         |
+| `setDataRow(row)` / `setDataValues(values)` | Points the reference to `row` and adds `row` to the packet. Throws when the current row is not in a `DataPacket` (a row from `createDataRow()` is not). |
+
+Rules:
+
+- A null reference has no row: test `isNull` before `dataRowValues` on a nullable reference.
+- A chain in `fields(...)` or `sort(...)` resolves its references automatically: `.fields((f) => [f.orderNumber, f.customer.name])` loads the customer with only its `name` (and its key).
+- Resolution is also available in server queries: `$Order.query(callContext).load(...).resolve(...)`.
+
+**Masked references.** The server does not resolve a reference when the current account lacks the read token of the target entity, or when a mixin filter of the target excludes the row. The reference keeps its key, `hasDataRow` is false and `isMasked` is true. UI code should show "not available" for a masked reference, not an error.
+
+### 3.4. Loading a Target Later
+
+When the reference was not resolved, load the target by its key or reference:
+
+```dart
+// Client
+final customer = await $Customer
+    .services(dataRegistry)
+    .loadThisRef(ref: order.customer.value)
+    .exactlyOne();
+
+// Server
+final customer = await $Customer
+    .query(callContext)
+    .loadKey(order.customer.primaryKey!)
+    .exactlyOne();
+```
+
+To add targets to an existing packet on the server, use `$Customer.query(callContext).resolveReferences(dataPacket, references, Expect())`: it loads only the rows the packet does not hold yet, and marks the excluded ones as masked.
+
+## 4. Finding Children (Reverse Lookups)
+
+### 4.1. With Searches (Client or Server)
+
+Full details: [searches through references](SEARCHES.md#5-searching-through-references).
+
+```dart
+// Lines of one order: criterion on the key value
+final lines = await $OrderLine
+    .services(dataRegistry)
+    .search(refToOrder: Search.equal(orderUuid))
+    .listValues();
+
+// Lines of pending orders: criterion on the fields of the target
+final lines = await $OrderLine
+    .services(dataRegistry)
+    .search(order: Order$Search(status: Search.equal(OrderStatus.pending)))
+    .listValues();
+
+// Orders with at least one line of more than 5 units: reverse criterion
+final orders = await $Order
+    .services(dataRegistry)
+    .search(
+      whereOrderLineOrder: $Order.whereOrderLineOrder(
+        OrderLine$Search(quantity: SearchOnInt(value: 5, type: .greaterThan)),
+      ),
+    )
+    .listValues();
+```
+
+`$Order.whereOrderLineOrder(filters)` is a generated helper that builds the `SearchOnForeignField(fieldName: "order", filters: ...)`. Pass `none: true` to `SearchOnForeignField` to keep the orders that **no** matching line points to.
+
+A reverse criterion `where<Entity><Field>` is generated on the target for each reference of a `@Searchable()` entity. Annotate the reference with `@NoReverseSearch()` to skip it.
+
+### 4.2. With Queries (Server)
+
+```dart
+final lines = await $OrderLine
+    .query(callContext)
+    .load(where: (fields) => fields.order.$pointToKey(orderUuid))
+    .listValues();
+```
+
+Compare a reference with `$pointToKey(key)`, `$pointToReference(ref)`, `$pointToRow(row)`, `$pointToValues(values)` or `$pointToFieldValue(fieldValue)`. Read the stored key with `$keyValue`. Details: [reference operations](QUERY_EXPRESSIONS.md#8-references).
+
+## 5. Navigating Through References
+
+A builder parameter (`fields`) exposes each reference as an `EntityFieldsChainView<Target>`. You can chain fields across references in every builder:
+
+| Builder                  | Example                                            | Effect                                               |
+| ------------------------ | -------------------------------------------------- | ---------------------------------------------------- |
+| query `where:`           | `fields.customer.address.country.$equal("FR")`     | The server adds the joins.                           |
+| `fields(...)`            | `[fields.orderNumber, fields.customer.name]`       | Reads only these fields; resolves `customer`.        |
+| `resolve(...)`           | `[fields.customer.address]`                        | Resolves `customer`, then its `address`.             |
+| `sort(...)`              | `[fields.customer.name, -fields.orderDate]`        | Sorts on the target field; resolves `customer`.      |
+| search                   | `customer: Customer$Search(name: ...)`             | Criterion on the target fields.                      |
+
+On a row, follow resolved references explicitly: `order.customer.dataRowValues.address.dataRowValues.city.value`.
+
+## 6. Checklist
+
+- Every `ReferenceTo` targets an entity with a single-field primary key.
+- `onDelete` matches the meaning: `cascade` for owned children, `error` for shared data, `setToNull` only on a `.nullable()` field.
+- Association entities have a unique index on their pair of references (or a composite primary key).
+- Parent references that never change are `.immutable()`.
+- Code that reads `xxx.dataRowValues` requests the reference in `resolve(...)` (or in a `fields(...)` chain) and handles `isNull` and `isMasked`.
+- New rows get their references with `primaryKey = ...` or `value = ...`; `setDataRow` only works on rows held in a `DataPacket`.

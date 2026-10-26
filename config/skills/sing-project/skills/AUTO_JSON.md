@@ -1,27 +1,152 @@
 # Data Exchange Between Client and Server
 
-## 1. JSON and Type Encoding
+## 1. Principle
 
-When exchanging data between a Sing client application and a Sing HTTP server, various types of data must be exchanged. JSON format is used for these exchanges, which poses the problem of encoding and decoding beyond the data types allowed by [the JSON standard](https://datatracker.ietf.org/doc/html/rfc8259):
-- string
-- int
-- double
-- bool
-- null
-- object (untyped)
-- array (untyped items)
+A Sing client and a Sing server exchange JSON. JSON only knows strings, numbers, booleans, `null`, objects and arrays ([RFC 8259](https://datatracker.ietf.org/doc/html/rfc8259)). Every other Dart type crosses the wire through a **JSON type adapter** that both sides share. The builder generates the adapters of the model types. Application code never writes JSON by hand for service parameters and results.
 
-For all other data types, there **must** be a shared convention between client and server on how to encode (and thus decode) all other data structures. Example: a date/time can be encoded as a character string in ISO-8601 format or as a number of milliseconds elapsed since a reference date/time, or as...
+When the receiver does not know the exact type in advance, the JSON carries a type marker: `$kind` for search criteria ([§6](#6-search-criteria)), `$entity` for rows and references ([§5](#5-wire-form-of-rows)). Model identifiers cannot contain `$`, so these keys never collide with a field name.
 
-A convention must therefore exist between client and server. It is necessary but sufficient **only** when the decoder knows with certainty the final type of the data to be decoded. Example: the convention indicates that a date/time is exchanged as a character string in ISO-8601 format; the sender sends a JSON object of type `string` and the decoder, **knowing that a date/time is expected**, decodes the string received.
+## 2. Types That Can Travel
 
-## 2. Type Information in JSON
+A service parameter, a service result, a property of a `@serializable` class and a typed `JsonField<T>` can use:
 
-If the expected data type is not strictly defined, another mechanism must exist. Example: in Sing, standard search services define a [`SearchOnField`](SEARCHES.md) parameter for each entity field. There are several classes derived from `SearchOnField` that a sender can send (e.g. `SearchEquality`, `SearchNull`, `SearchIn`, etc.). In these cases, to correctly decode the data, it is necessary that the encoder indicates **the real type** of the data sent.
+| Kind | Types |
+| ---- | ----- |
+| Scalars | `String`, `int`, `double`, `bool`, `DateTime`, `UtcDateTime`, `LocalDateTime`, `DateOnly`, `TimeOnly`, `Duration`, `Decimal`, `DateRange`, `DateTimeRange`, `Uint8List` |
+| Enums | any enum the model reaches: field type, service signature, `@serializable` class property ([§3.3](#33-enums)) |
+| Model data | `Reference<X>`, `DataRow<X>`, `X$Instance` (`DataRowValues<X>`), `DataPacket<X>`, `DataLoader<X>` (result), `Expect<X>`, `X$Search` |
+| Analysis | `CubeDefinition`, `CubeResult` |
+| Classes | classes annotated `@serializable` ([§4](#4-serializable-classes-dtos)) |
+| Containers | `List<T>`, `Iterable<T>`, `Set<T>`, `Map<String, T>` of any type above |
 
-### 2.1. The `$kind` Key of Search Criteria
+Each type is served by a `JsonTypeAdapter<T>` (`sing_core/lib/src/types/json_type_adapter.dart`) with `toJson(T)`, `fromJson(JsonReader)` and `jsonSchema` (for OpenAPI). `JsonTypeAdapters.typed<T>()` returns the registered adapter of `T` and throws when none is registered. Generated model layers register theirs through `ModelLayer.jsonAdapters` when the `DataRegistry` is built.
 
-Every `SearchOn` criterion travels as a JSON object carrying a `$kind` key naming its class (`SearchOn.kindKey`), next to its own state. Model identifiers cannot contain `$`, so the key never collides with a field name. This long form is the only accepted one.
+## 3. Scalar Forms
+
+### 3.1. Dates, Times and Durations
+
+| Type | JSON |
+| ---- | ---- |
+| `DateTime`, `UtcDateTime`, `LocalDateTime`, `DateOnly` | ISO-8601 string |
+| `TimeOnly` | integer, microseconds since midnight |
+| `Duration` | integer, microseconds |
+| `DateRange`, `DateTimeRange` | object with the bounds, or `{"empty": true}` |
+
+### 3.2. Numbers and Binary
+
+| Type | JSON |
+| ---- | ---- |
+| `Decimal` | string (exact value) |
+| `Uint8List` | base64 string |
+
+### 3.3. Enums
+
+An enum value travels as its `name`. This is also true for a `DbEnum`: its `key` is used in the database only. The builder registers a `JsonEnumAdapter<E>` for every enum it reaches. An enum reached by nothing else can be registered with `@serializable` on the enum:
+
+```dart
+@serializable
+enum QuoteBasis { flat, weighted, negotiated }
+```
+
+## 4. Serializable Classes (DTOs)
+
+`@serializable` (or `@Serializable()`) on a class lets it travel. The class must be declared in the `lib/` of the model package or of the `common` package (`commonPackagePath`). Put it in `common` when the client uses it. Example from `example/common/lib/src/dto/shipping_quote.dart`:
+
+```dart
+@serializable
+class ShippingQuote {
+  const ShippingQuote({
+    required this.carrier,
+    required this.amount,
+    required this.basis,
+    required this.options,
+    this.comment,
+  });
+
+  final String carrier;
+  final Decimal amount;
+  final QuoteBasis basis;
+  final List<String> options;
+  final String? comment;
+}
+```
+
+The builder writes the JSON form from the fields when the class follows these rules:
+
+- the class is not abstract and no other class extends it;
+- it has an unnamed, non-factory constructor with **named** parameters only;
+- every public instance field is `final` and filled by a constructor parameter of the same name;
+- every field type can travel ([§2](#2-types-that-can-travel)), including model types (`Order$Instance`, `Order$Search`) and other `@serializable` classes.
+
+A field is optional on the wire when its constructor parameter is nullable.
+
+A class can state its own form instead, with **both** a `fromJson` factory and a `toJson` method:
+
+```dart
+@serializable
+class TrackingCode {
+  const TrackingCode(this.value);
+
+  factory TrackingCode.fromJson(JsonReader json) => TrackingCode(json.asString);
+
+  final String value;
+
+  Object toJson() => value;
+}
+```
+
+The factory takes a `JsonReader`. It reaches the data registry through `json.dataRegistry` when it needs it.
+
+A class that breaks a rule, or declares only one of `fromJson` and `toJson`, is **skipped with a warning**: it is not registered, and a service using it fails at run time. Read the `sing_emit` warnings after each build.
+
+`@serializable` on a superclass does not register its subclasses.
+
+## 5. Wire Form of Rows
+
+### 5.1. `DataRow`
+
+A row travels as an object with its field values, each written by the adapter of its field, plus metadata keys:
+
+| Key | Content |
+| --- | ------- |
+| `$entity` | the `tupleKey` of its entity (its path, `orders/orders`) or tuple ([Tuples](DATA_MODEL.md#8-tuples)) |
+| `$state` | the row state name (`initial`, `inserted`, `updated`, `deleted`) |
+| `$updated` | the names of the fields the row means to write, when some are updated |
+| `$rowVersion` | the [row version](DATA_CLASSES.md#4-row-version) read with the row, when known |
+| `$checkRowVersion` | `true` when the next update must check the version |
+
+```json
+{"$entity": "orders/orders", "$state": "updated", "$rowVersion": 3,
+ "uuid": "…", "status": "shipped", "$updated": ["status"]}
+```
+
+- Fields without a value, server-only fields and fields without a column (`@SearchOnlyField`, own key references) are not written.
+- On reading, `$updated` cannot mark a primary key or an immutable field as updated.
+
+### 5.2. `Reference`
+
+```json
+{"$entity": "orders/customers", "primaryKey": "…"}
+```
+
+A row not inserted yet has no key. Its reference carries a `uuid` instead, which the packet uses to match it.
+
+### 5.3. `DataPacket`
+
+A `DataPacket` (the result of a `DataLoader`) travels as:
+
+```json
+{"$entity": "orders/orders", "resultRows": 2, "paginated": true,
+ "dataRows": [ … ], "maskedRefs": [ … ]}
+```
+
+- `dataRows` holds the `resultRows` result rows first, then the rows reached through references.
+- `paginated` is written only when `true`. `maskedRefs` (references the caller may not read) only when not empty.
+- `$entity` is absent for a packet typed `DataPacket<Entity>`.
+
+## 6. Search Criteria
+
+Every `SearchOn` criterion travels as an object with a `$kind` key (`SearchOn.kindKey`) naming its class, next to its own state. This long form is the only accepted one.
 
 ```json
 {"$kind": "string", "text": "lyo", "type": "contains", "caseSensitive": true}
@@ -29,23 +154,4 @@ Every `SearchOn` criterion travels as a JSON object carrying a `$kind` key namin
 {"$kind": "all", "conditions": [{"$kind": "equal", "value": 1}, {"$kind": "null", "notNull": true}]}
 ```
 
-`SearchOnField.fromJson<T>(json)` rebuilds the criterion from `$kind`, `T` being the field type the declaring class states. A generated `Xxx$Search` writes its non-empty filters and its `@SearchOnlyField` values, and refuses an unknown key on reading (`SearchOnEntity.checkedMap`).
-
-## 3. Type Adapters
-
-Each type crossing the wire is served by a `JsonTypeAdapter<T>` (`toJson`, `fromJson`, `jsonSchema`). `JsonTypeAdapters.typed<T>()` returns the adapter of a type; a model registers its own adapters through its `ModelLayer.jsonAdapters` (enums: `JsonEnumAdapter<E>`; searches: `SearchOnEntityAdapter`, `SearchOnFieldAdapter<V>`, `SearchOnForeignFieldAdapter<PK, FK>`).
-
-`@Serializable()` (or `@serializable`) registers a type of the model so that it can travel as a service parameter or result:
-- on an enum, the enum registers itself;
-- on a class, the builder writes its form from its fields (every instance field final and named by a constructor parameter) or routes to the `fromJson`/`toJson` pair the class exposes; exposing only one of the two is refused.
-
-## 4. Wire Form of Rows
-
-A `DataRow` travels as an object holding, next to its field values written through their adapters:
-- `$entity`: the `tupleKey` of its entity (its path) or tuple ([see tuples](DATA_MODEL.md));
-- `$state`: the row state name;
-- `$updated`: the fields it means to write, when some are updated.
-
-Fields marked `@serverSideOnly` are never written. A `DataPacket` (result of a `DataLoader`) travels as `{"$entity": ..., "resultRows": <count>, "dataRows": [...rows...], "paginated": ..., "maskedRefs": [...]}`, `dataRows` holding the result rows followed by the rows resolved through references.
-
-
+`SearchOnField.fromJson<V>(json)` rebuilds a criterion from `$kind`, `V` being the field value type. A generated `X$Search` writes its non-empty criteria and its `@SearchOnlyField` values, and refuses an unknown key on reading (`SearchOnEntity.checkedMap`). Criteria themselves are described in [Searches](SEARCHES.md).

@@ -24,7 +24,7 @@ Construire une documentation complète et cohérente destinée à des agents LLM
 - **Architecture modulaire** : 1 fichier = 1 concept/sujet
 - **Point d'entrée unique** : `~/.claude/skills/sing-project/SKILL.md`
 - **Navigation structurée** : Liens clairs vers les autres fichiers
-- **Exemples concrets** : Basés sur `example/orderhub/` (simple) et `C:\Travail\Projets\balossi\gbom\` (complexe). gbom ne doit être utilisé que dans ton travail et **jamais** dans les fichiers markdown sur lesquels nous travaillons.
+- **Exemples concrets** : basés sur `example/` de sing2 (OrderHub, simple) et, pour les fonctionnalités rares, sur `coverage/`. Les applications de production `C:\Travail\Projets\balossi\socle`, `patient_activities` et `gbom` servent uniquement à mesurer l'usage réel et à repérer les pièges : **jamais** de code, de nom ni de chemin balossi dans les fichiers markdown du skill.
 
 ### Livrables du projet
 - tous les fichiers à construire sont placé dans le répertoire `~/.claude/skills/sing-project/skills/`.
@@ -67,7 +67,7 @@ Il faut alors :
 Cette vérification porte sur l'ensemble de la documentation AGENT :
 
 1. **Cohérence de la navigation**
-   - Vérifier que tous les documents sont accessibles en suivant des liens depuis `AGENT/SKILLS.md`
+   - Vérifier que tous les documents sont accessibles en suivant des liens depuis `SKILL.md`
    - Vérifier que tous les liens entre documents sont valides
    - Identifier les fichiers orphelins (non référencés)
 
@@ -77,7 +77,7 @@ Cette vérification porte sur l'ensemble de la documentation AGENT :
    - Y a-t-il des ambiguïtés ou synonymes problématiques ?
 
 3. **Cohérence des exemples**
-   - Les exemples utilisent-ils cohéremment `example/orderhub/` ?
+   - Les exemples utilisent-ils de façon cohérente `example/` (OrderHub) ?
    - Les exemples sont-ils à jour avec le code actuel ?
    - Les patterns montrés sont-ils cohérents entre documents ?
 
@@ -129,6 +129,9 @@ Lorsque tu ne respectes pas une consigne :
 - 26/11/25 : documentation complétée pour la définition des espaces de nom, des entités et des champs (fichier DATA_MODEL.md).
 - 30/08/26 : QUERIES.md, SERVICES.md, DATA_CLASSES.md réalignés sur le chantier moteur de requêtes : `Query<E, PK>` fusionnée (plus de `queryPk`), verbes de lecture et d'écriture plats (`load(where:)`, `insert(rows)`, `updateWhere(set:, where:)`, `delete(where:)`, `upsert(rows, on:)` sur `MergeRows`), nouvelle section sur le builder du moteur ouvert par `select()` (jointures, `groupBy`/`project`, CTE, compounds), `insertSelect`/`updateSelect`.
 - 04/09/26 : synchronisation complète sur sing2 `139f81bc` : couches de modèle (`Xxx$Layer`, `ModelLayer`), interfaces de registre (`XxxRegistry<E>`, `XxxServerRegistry`/`XxxClientRegistry` avec fabrique et `modelLayers`, `DataRegistryBase`), `tupleKey`, expressions de référence (`RefFieldExpr` sur `Reference<E>`, `$pointToXXX`, `$keyValue`, `nullSafe`), verbes `insertRow`/`insertRows`, `insertNewRow`, API fluide des selects, recherches typées sur `Xxx$Search`. SUBMODELS.md et MIGRATIONS.md réécrits sur l'API réelle ; SKILL.md et PROJECT_STRUCTURE.md réalignés sur `example/` (pas de `example/orderhub`, build par `build/sing_build.dart`).
+- 01/10/26 : génération par `sing_emit` (`sing_build.dart` supprimé le 14/09 par `27d368e2`) dans SKILL.md, SKILLS.md, DATA_MODEL.md, GENERATED_CODE.md, INIT_PROJECT.md, PROJECT_STRUCTURE.md et SERVICES.md (refus sans écriture, `--force` au lieu de `sing.incorrect`) ; `foundation` décrit comme simple dépendance Dart (plus généré depuis `e43074ac`) ; rôle réel de `isSubModel` dans SUBMODELS.md.
+- 02/10/26 : SUBMODELS.md §3.3 : plusieurs sous-modèles (diamant), identifiant par couche, greffes `@GraftedInto` et montage automatique des enfants d'une racine montée à côté.
 
 ---
 
+- 25/10/26 : audit complet contre sing2 `5ebc193a` (exemple, coverage, usage réel balossi). Conflits de merge du dépôt claude-config résolus côté distant dans le skill (merge non commité). Tous les documents corrigés ; SKILL.md refait (table « tâche → document », paquets, frontmatter réparé, § `AGENT/` et mentions `sing_init_socle` retirés). Fusions : SEARCH_ON_FIELD.md → SEARCHES.md, VERSIONS.md → MIGRATIONS.md ; SKILLS.md supprimé (doublon périmé). Scissions : FIELD_TYPES.md (depuis DATA_MODEL.md), QUERY_EXPRESSIONS.md (depuis QUERIES.md). Nouveaux : ACCESS_CONTROL.md, ERRORS.md, TRANSACTIONS.md, NOTIFICATIONS.md, CUBE.md, VIEW_ENTITIES.md, TESTING.md, DEBUGGING.md. Exemple Socle de SUBMODELS.md remplacé par le losange de coverage.
