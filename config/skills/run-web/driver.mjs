@@ -172,6 +172,13 @@ const COMMANDS = {
     console.log("click-xy", x, y, "→ OK");
   },
 
+  async "hover-xy"(args) {
+    if (!page) return console.log("ERROR: nav first");
+    const [x, y] = args.split(/\s+/).map(Number);
+    await page.mouse.move(x, y, { steps: 5 });
+    console.log("hover-xy", x, y, "→ OK");
+  },
+
   async fill(args) {
     if (!page) return console.log("ERROR: nav first");
     const [sel, ...rest] = args.split(/\s+/);

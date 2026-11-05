@@ -52,6 +52,7 @@ default `default`); the latest is also copied to `screenshot.png`.
 | `burst <name> [count] [intervalMs]` | screenshot series (`<name>-00.png`…, default 10 × 250 ms) to catch transient UI states |
 | `click <sel\|text=…>` | CSS click (works for real DOM apps) |
 | `click-xy <x> <y>` | pixel-coordinate click — **required for CanvasKit** (see below) |
+| `hover-xy <x> <y>` | move the mouse without clicking, to reveal hover-only buttons (CanvasKit included) |
 | `fill <sel> <value…>` | fill a real DOM input |
 | `type <text>` / `press <key>` | keyboard input at current focus |
 | `eval <js-expression>` | evaluate in page, prints JSON |
